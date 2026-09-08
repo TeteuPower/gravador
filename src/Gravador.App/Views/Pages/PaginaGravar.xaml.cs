@@ -144,9 +144,11 @@ public partial class PaginaGravar : UserControl
             _ => "Parar e salvar",
         };
         BtnGravar.IsEnabled = estado != EstadoGravacao.Finalizando;
+        // Vermelho só para COMEÇAR. Gravando, o botão fica neutro: o vermelho é o sinal de "isto
+        // vai gravar", e mantê-lo aceso durante a gravação o transformaria em "pare agora", que é
+        // a leitura contrária.
         BtnGravar.Background = (Brush)FindResource(emAndamento ? "SuperficieAlta" : "Gravando");
         BtnGravar.BorderBrush = (Brush)FindResource(emAndamento ? "Borda" : "Gravando");
-        BtnGravar.Foreground = (Brush)FindResource(emAndamento ? "Texto" : "Texto");
 
         BtnPausar.IsEnabled = emAndamento;
         BtnPausar.Content = estado == EstadoGravacao.Pausada ? "Retomar" : "Pausar";
