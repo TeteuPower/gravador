@@ -251,6 +251,61 @@ Ele pagou o custo dele já na primeira execução, pegando dois defeitos:
 
 Não substitui olhar: prova que desenha, não que ficou bom.
 
+## O que foi verificado, e como
+
+Números medidos nesta máquina (i7-14700HX, 28 núcleos lógicos, Windows 11), não estimados.
+
+### O alinhamento das trilhas
+
+Gravação de prova de 9 s com som tocando no dispositivo padrão:
+
+| arquivo | duração | RMS |
+|---|---:|---:|
+| `sistema.mp3` | 9,17 s | −33,0 dB |
+| `microfone.mp3` | 9,17 s | −73,0 dB (sala em silêncio) |
+| `mixado.mp3` | 9,17 s | −33,0 dB |
+
+As três batem no centésimo de segundo. Antes da correção do `Mixer.Finalizar`, a mixada saía com
+12,17 s — três segundos de zeros a mais, que eram o acumulador sendo despejado inteiro no fim.
+
+### O mudo silenciando de verdade
+
+Doze segundos, microfone com sinal real, mudo ligado aos 3,8 s e desligado aos 7,9 s. RMS por
+segundo, com `SILÊNCIO` significando zero digital e não apenas "baixo":
+
+Com **"guardar na trilha, silenciar na mistura"** (o padrão):
+
+```
+microfone.wav   -50,9  -53,1  -51,4  -52,3  -52,6  -53,2  -51,7  -53,8  -53,6  -52,8  -53,5  -53,2
+mixado.wav      -50,9  -53,1  -51,4  -53,2   SIL.   SIL.   SIL.  -62,2  -53,6  -52,8  -53,5  -53,2
+```
+
+A sua trilha guarda tudo; a mistura vira o que a reunião ouviu. É exatamente a promessa da opção.
+
+Com **"não gravar nada do que eu disser mudo"**, as duas ficam em silêncio no mesmo intervalo — e
+voltam no segundo seguinte à liberação, sem arrastar.
+
+### O custo
+
+| | Memória privada | CPU |
+|---|---:|---:|
+| `gravador-cli ipc` gravando duas trilhas | 12 MB | 0,04% de 28 núcleos (~1% de um) |
+| Aplicação na bandeja | 155 MB | ocioso |
+| Aplicação com a janela | 194 MB | ocioso |
+| App WPF **vazio**, para referência | 164 MB | — |
+
+### O que NÃO foi verificado
+
+Duas coisas ficaram sem prova nesta máquina, e vale dizer quais:
+
+- **A captura de tela em imagem final.** O caminho inteiro (BitBlt, redimensionamento, JPEG) foi
+  exercitado e produziu um arquivo correto, mas a máquina de desenvolvimento estava com o protetor
+  de tela ligado durante a construção — a captura pelo atalho, com a área de trabalho normal na
+  frente, é o que falta ver funcionando de verdade.
+- **A detecção do mudo pelo atalho do aplicativo.** O gancho de teclado, o catálogo e a virada de
+  estado foram exercitados pelo caminho manual, que passa exatamente pelo mesmo ponto. O que falta é
+  o teste com o Teams aberto de verdade, apertando `Ctrl+Shift+M`.
+
 ## O que ficou de fora, e por quê
 
 **Gravar vídeo.** O propósito é virar texto para uma IA; vídeo multiplica o tamanho por dez sem
