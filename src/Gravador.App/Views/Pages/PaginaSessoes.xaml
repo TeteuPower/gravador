@@ -1,0 +1,54 @@
+<UserControl x:Class="Gravador.App.Views.Pages.PaginaSessoes"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="28,24,28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <Grid>
+                <StackPanel>
+                    <TextBlock Text="Gravações" Style="{StaticResource Titulo}"/>
+                    <TextBlock x:Name="TxtResumoPasta" Style="{StaticResource Fraco}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Button Content="Abrir a pasta" Click="AoAbrirPastaRaiz" Style="{StaticResource BotaoDiscreto}"/>
+                    <Button Content="Atualizar" Click="AoAtualizar" Margin="8,0,0,0"/>
+                </StackPanel>
+            </Grid>
+            <TextBlock x:Name="TxtVazio" Style="{StaticResource Fraco}" Margin="0,24,0,0" Visibility="Collapsed"
+                       Text="Nenhuma gravação ainda. Volte para a aba Gravar e aperte Gravar — ou use o atalho, sem sair da reunião."/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0">
+            <ItemsControl x:Name="Lista">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Cartao}" Margin="0,0,8,12">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Titulo}" FontWeight="SemiBold" FontSize="14"/>
+                                        <TextBlock Text="{Binding Detalhe}" Style="{StaticResource Fraco}" Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                        <Button Content="Abrir a pasta" Style="{StaticResource BotaoDiscreto}"
+                                                Tag="{Binding Pasta}" Click="AoAbrirPasta"/>
+                                        <Button Content="{Binding TextoDoBotaoResumo}" Margin="8,0,0,0"
+                                                Tag="{Binding Pasta}" Click="AoResumir"/>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="{Binding Conteudo}" Style="{StaticResource Fraco}" Margin="0,10,0,0"/>
+                                <TextBlock Text="{Binding Estado}" Style="{StaticResource Fraco}" Margin="0,8,0,0"
+                                           Foreground="{StaticResource Acento}"
+                                           Visibility="{Binding VisibilidadeDoEstado}"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

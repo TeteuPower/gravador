@@ -1,0 +1,146 @@
+<UserControl x:Class="Gravador.App.Views.Pages.PaginaGravar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="28,24,28,24">
+        <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+
+            <TextBlock Text="Gravar" Style="{StaticResource Titulo}"/>
+            <TextBlock x:Name="TxtPasta" Style="{StaticResource Fraco}" Margin="0,0,0,18"/>
+
+            <!-- ================= Controle principal ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock x:Name="TxtCronometro" Text="00:00:00" FontSize="44" FontWeight="Light"
+                                       FontFamily="Consolas"/>
+                            <TextBlock x:Name="TxtSubestado" Style="{StaticResource Fraco}" Text="pronto para gravar"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Button x:Name="BtnGravar" Style="{StaticResource BotaoPrincipal}" Content="Gravar"
+                                HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="150"
+                                Click="AoClicarGravar"/>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                        <Button x:Name="BtnPausar" Content="Pausar" Click="AoClicarPausar" IsEnabled="False" MinWidth="96"/>
+                        <Button x:Name="BtnCapturar" Content="Capturar a tela" Click="AoClicarCapturar" Margin="8,0,0,0"/>
+                        <Button x:Name="BtnMarcar" Content="Marcar momento" Click="AoClicarMarcar" Margin="8,0,0,0" IsEnabled="False"/>
+                        <Button x:Name="BtnAbrirPasta" Style="{StaticResource BotaoDiscreto}" Content="Abrir a pasta"
+                                Click="AoClicarAbrirPasta" Margin="8,0,0,0"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="TxtAtalhos" Style="{StaticResource Fraco}" FontSize="11" Margin="0,12,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Microfone: mudo ================= -->
+            <Border x:Name="CartaoMudo" Style="{StaticResource Cartao}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="LuzMudo" Width="9" Height="9" VerticalAlignment="Center"
+                                     Fill="{StaticResource Bom}"/>
+                            <TextBlock x:Name="TxtMudo" Text="Microfone aberto" Margin="9,0,0,0"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TxtMudoDetalhe" Style="{StaticResource Fraco}" Margin="18,6,0,0"
+                                   Text="Ninguém em chamada agora."/>
+                    </StackPanel>
+                    <Button Grid.Column="1" x:Name="BtnMudo" Content="Estou mudo" Click="AoClicarMudo"
+                            VerticalAlignment="Center" MinWidth="128"/>
+                </Grid>
+            </Border>
+
+            <!-- ================= Medidores ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="132"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Computador" FontSize="12"/>
+                            <TextBlock x:Name="TxtDispSistema" Style="{StaticResource Fraco}" FontSize="10.5"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" x:Name="TrilhoSistema" Height="12" CornerRadius="6"
+                                Background="{StaticResource Fundo}" VerticalAlignment="Center">
+                            <Border x:Name="NivelSistema" Height="12" CornerRadius="6" Width="0"
+                                    HorizontalAlignment="Left" Background="{StaticResource Acento}"/>
+                        </Border>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="132"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Seu microfone" FontSize="12"/>
+                            <TextBlock x:Name="TxtDispMicrofone" Style="{StaticResource Fraco}" FontSize="10.5"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" x:Name="TrilhoMicrofone" Height="12" CornerRadius="6"
+                                Background="{StaticResource Fundo}" VerticalAlignment="Center">
+                            <Border x:Name="NivelMicrofone" Height="12" CornerRadius="6" Width="0"
+                                    HorizontalAlignment="Left" Background="{StaticResource Bom}"/>
+                        </Border>
+                    </Grid>
+
+                    <TextBlock x:Name="TxtLegenda" Style="{StaticResource Fraco}" Margin="0,14,0,0"
+                               Visibility="Collapsed" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Linha do tempo ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="Linha do tempo" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="TxtContagem" Style="{StaticResource Fraco}" HorizontalAlignment="Right"/>
+                    </Grid>
+                    <ItemsControl x:Name="ListaMarcas" Margin="0,12,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,7">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="58"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Carimbo}" FontFamily="Consolas"
+                                               FontSize="12" Foreground="{StaticResource TextoFraco}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Rotulo}" FontSize="12"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="TxtSemMarcas" Style="{StaticResource Fraco}" Margin="0,10,0,0"
+                               Text="Nada marcado ainda. Use os atalhos para capturar a tela ou marcar um momento sem sair da reunião."/>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Avisos ================= -->
+            <Border x:Name="CartaoAviso" Style="{StaticResource Cartao}" Visibility="Collapsed"
+                    BorderBrush="{StaticResource Aviso}">
+                <StackPanel>
+                    <TextBlock Text="Avisos" FontWeight="SemiBold" Foreground="{StaticResource Aviso}"/>
+                    <ItemsControl x:Name="ListaAvisos" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Style="{StaticResource Fraco}" Margin="0,0,0,5"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

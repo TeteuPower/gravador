@@ -1,0 +1,254 @@
+<UserControl x:Class="Gravador.App.Views.Pages.PaginaConfiguracoes"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style x:Key="Rotulo" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Texto}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,14,0"/>
+        </Style>
+        <Style x:Key="Dica" TargetType="TextBlock" BasedOn="{StaticResource Fraco}">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Margin" Value="0,4,0,10"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="28,24,20,24">
+        <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+
+            <TextBlock Text="Configurações" Style="{StaticResource Titulo}"/>
+            <TextBlock x:Name="TxtArquivoConfig" Style="{StaticResource Fraco}" Margin="0,0,0,18"/>
+
+            <!-- ================= Dispositivos ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="O que gravar" FontWeight="SemiBold" FontSize="14"/>
+
+                    <CheckBox x:Name="ChkSistema" Content="Áudio do computador (o que os outros falam)" Margin="0,12,0,0"/>
+                    <ComboBox x:Name="CmbSistema" DisplayMemberPath="Rotulo" Margin="0,6,0,0"/>
+                    <TextBlock Style="{StaticResource Dica}"
+                               Text="O Windows grava o que está tocando em UM dispositivo de saída. Se você usa fone na reunião, escolha o fone — não a caixa de som."/>
+
+                    <CheckBox x:Name="ChkMicrofone" Content="Seu microfone" Margin="0,10,0,0"/>
+                    <ComboBox x:Name="CmbMicrofone" DisplayMemberPath="Rotulo" Margin="0,6,0,0"/>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Ganho do computador" Style="{StaticResource Rotulo}"/>
+                        <Slider Grid.Column="1" x:Name="SldGanhoSistema" Minimum="0" Maximum="4" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Column="2" x:Name="TxtGanhoSistema" Style="{StaticResource Rotulo}" Margin="12,0,0,0" MinWidth="42"/>
+                    </Grid>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Ganho do microfone" Style="{StaticResource Rotulo}" MinWidth="141"/>
+                        <Slider Grid.Column="1" x:Name="SldGanhoMicrofone" Minimum="0" Maximum="4" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Column="2" x:Name="TxtGanhoMicrofone" Style="{StaticResource Rotulo}" Margin="12,0,0,0" MinWidth="42"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Arquivos ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="Arquivos" FontWeight="SemiBold" FontSize="14"/>
+
+                    <TextBlock Text="Trilhas" Style="{StaticResource Secao}" Margin="0,12,0,6"/>
+                    <ComboBox x:Name="CmbTrilhas"/>
+                    <TextBlock Style="{StaticResource Dica}"
+                               Text="Separadas ajudam muito a IA: com o seu microfone em um arquivo e a reunião em outro, ela sabe quem falou o quê sem adivinhar."/>
+
+                    <TextBlock Text="Formato" Style="{StaticResource Secao}" Margin="0,4,0,6"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0" x:Name="CmbFormato"/>
+                        <TextBlock Grid.Column="1" Text="kbps" Style="{StaticResource Rotulo}" Margin="14,0,8,0"/>
+                        <ComboBox Grid.Column="2" x:Name="CmbKbps" MinWidth="80"/>
+                    </Grid>
+                    <TextBlock x:Name="TxtEstimativa" Style="{StaticResource Dica}"/>
+                    <CheckBox x:Name="ChkManterWav" Content="Guardar também o WAV sem perdas"/>
+
+                    <TextBlock Text="Pasta das gravações" Style="{StaticResource Secao}" Margin="0,4,0,6"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" x:Name="TxtPastaSaida"/>
+                        <Button Grid.Column="1" Content="Escolher..." Click="AoEscolherPasta" Margin="8,0,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Mudo ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="Quando o seu microfone está mudo" FontWeight="SemiBold" FontSize="14"/>
+                    <TextBlock Style="{StaticResource Dica}" Margin="0,6,0,10"
+                               Text="Existem dois mudos. O do Windows é fato: ninguém te ouve. O do Teams, Meet ou Zoom não existe do lado do sistema — o aplicativo continua lendo o microfone e só para de mandar o seu áudio. Para esse, o Gravador vigia o atalho de mudo do aplicativo em primeiro plano e trata o resultado como palpite."/>
+
+                    <ComboBox x:Name="CmbQuandoMudo"/>
+                    <TextBlock Style="{StaticResource Dica}"
+                               Text="O padrão guarda tudo na sua trilha e põe silêncio só na mistura — assim o arquivo misturado é o que a reunião ouviu, e nada do que você disse se perde."/>
+
+                    <CheckBox x:Name="ChkDetectarApps" Content="Vigiar os atalhos de mudo dos aplicativos de reunião"/>
+                    <TextBlock x:Name="TxtAppsVigiados" Style="{StaticResource Dica}"/>
+
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Limiar de voz" Style="{StaticResource Rotulo}"/>
+                        <Slider Grid.Column="1" x:Name="SldLimiar" Minimum="-70" Maximum="-15" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Column="2" x:Name="TxtLimiar" Style="{StaticResource Rotulo}" Margin="12,0,0,0" MinWidth="52"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Capturas ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="Capturas de tela" FontWeight="SemiBold" FontSize="14"/>
+                    <TextBlock Style="{StaticResource Dica}" Margin="0,6,0,10"
+                               Text="Cada captura entra na linha do tempo com o instante do áudio, e vai junto no pacote que a IA recebe no fim."/>
+
+                    <ComboBox x:Name="CmbAlvoCaptura"/>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0" x:Name="CmbFormatoImagem"/>
+                        <TextBlock Grid.Column="1" Text="lado maior" Style="{StaticResource Rotulo}" Margin="14,0,8,0"/>
+                        <ComboBox Grid.Column="2" x:Name="CmbLarguraMaxima" MinWidth="110"/>
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Capturar sozinho a cada" Style="{StaticResource Rotulo}"/>
+                        <ComboBox Grid.Column="1" x:Name="CmbAutoCaptura" MinWidth="150"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Atalhos ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="Atalhos globais" FontWeight="SemiBold" FontSize="14"/>
+                    <TextBlock Style="{StaticResource Dica}" Margin="0,6,0,10"
+                               Text="Clique no campo e aperte a combinação. Eles funcionam com qualquer programa na frente — é isso que permite marcar e capturar sem sair da reunião."/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Gravar / parar" Style="{StaticResource Rotulo}" Margin="0,0,14,8"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="TxtAtalhoGravar" IsReadOnly="True" Margin="0,0,0,8"
+                                 PreviewKeyDown="AoTeclarAtalho" GotFocus="AoFocarAtalho"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Pausar / retomar" Style="{StaticResource Rotulo}" Margin="0,0,14,8"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TxtAtalhoPausar" IsReadOnly="True" Margin="0,0,0,8"
+                                 PreviewKeyDown="AoTeclarAtalho" GotFocus="AoFocarAtalho"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Capturar a tela" Style="{StaticResource Rotulo}" Margin="0,0,14,8"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TxtAtalhoCapturar" IsReadOnly="True" Margin="0,0,0,8"
+                                 PreviewKeyDown="AoTeclarAtalho" GotFocus="AoFocarAtalho"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Marcar momento" Style="{StaticResource Rotulo}" Margin="0,0,14,0"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TxtAtalhoMarcar" IsReadOnly="True"
+                                 PreviewKeyDown="AoTeclarAtalho" GotFocus="AoFocarAtalho"/>
+                    </Grid>
+                    <TextBlock x:Name="TxtAtalhosRecusados" Style="{StaticResource Dica}"
+                               Foreground="{StaticResource Aviso}" Margin="0,10,0,0" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Transcrição ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="Transcrição" FontWeight="SemiBold" FontSize="14"/>
+                    <TextBlock Style="{StaticResource Dica}" Margin="0,6,0,10"
+                               Text="Sem transcrição, a sessão entrega o áudio e as imagens para você mandar para a IA que preferir — é o caminho mais leve e o padrão."/>
+
+                    <ComboBox x:Name="CmbTranscricao"/>
+                    <TextBlock x:Name="TxtTranscricaoDica" Style="{StaticResource Dica}"/>
+
+                    <StackPanel x:Name="PainelRemoto" Visibility="Collapsed">
+                        <TextBlock Text="Endereço do serviço" Style="{StaticResource Secao}" Margin="0,4,0,6"/>
+                        <TextBox x:Name="TxtRemotoUrl"/>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                <TextBlock Text="Modelo" Style="{StaticResource Rotulo}" Margin="0,0,0,6"/>
+                                <TextBox x:Name="TxtRemotoModelo"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                <TextBlock Text="Variável de ambiente com a chave" Style="{StaticResource Rotulo}" Margin="0,0,0,6"/>
+                                <TextBox x:Name="TxtRemotoChave"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="TxtChaveEstado" Style="{StaticResource Dica}" Margin="0,8,0,0"/>
+                    </StackPanel>
+
+                    <CheckBox x:Name="ChkAoVivo" Content="Transcrever enquanto grava" Margin="0,8,0,0"/>
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Idioma" Style="{StaticResource Rotulo}"/>
+                        <ComboBox Grid.Column="1" x:Name="CmbIdioma" MinWidth="150" IsEditable="True"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Geral ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="Geral" FontWeight="SemiBold" FontSize="14"/>
+                    <CheckBox x:Name="ChkIniciarComWindows" Content="Iniciar com o Windows (direto na bandeja)" Margin="0,10,0,0"/>
+                    <CheckBox x:Name="ChkFecharParaBandeja" Content="Fechar no X manda para a bandeja em vez de encerrar"/>
+                    <CheckBox x:Name="ChkComecarMinimizado" Content="Abrir minimizado"/>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,24">
+                <Button Content="Salvar" Style="{StaticResource BotaoPrincipal}" Click="AoSalvar" MinWidth="130"
+                        Background="{StaticResource Acento}" BorderBrush="{StaticResource Acento}" Foreground="#12141C"/>
+                <Button Content="Desfazer" Click="AoDesfazer" Margin="8,0,0,0"/>
+                <TextBlock x:Name="TxtSalvo" Style="{StaticResource Fraco}" VerticalAlignment="Center"
+                           Margin="14,0,0,0" Foreground="{StaticResource Bom}"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

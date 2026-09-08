@@ -153,7 +153,14 @@ public sealed class AppSettings
     public string AtalhoGravar { get; set; } = "Ctrl+Alt+G";
     public string AtalhoPausar { get; set; } = "Ctrl+Alt+Espaço";
     public string AtalhoCapturar { get; set; } = "Ctrl+Alt+P";
-    public string AtalhoMarcar { get; set; } = "Ctrl+Alt+M";
+
+    /// <summary>
+    /// N de "nota", e não M de "marcar": Ctrl+Alt+M já vem tomado em boa parte das máquinas
+    /// Windows (utilitários de placa de vídeo e de fabricante costumam registrá-lo), e o
+    /// RegisterHotKey devolve ERROR_HOTKEY_ALREADY_REGISTERED. Um atalho padrão que não funciona
+    /// na primeira execução é pior do que um sem mnemônico perfeito.
+    /// </summary>
+    public string AtalhoMarcar { get; set; } = "Ctrl+Alt+N";
 
     // ---------------- Transcrição ----------------
 

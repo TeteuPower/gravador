@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Gravador.App</RootNamespace>
+    <AssemblyName>Gravador</AssemblyName>
+    <!-- WPF e WinForms no mesmo projeto geram ambiguidades (Timer, Application, Cursor...);
+         os usings implícitos deixariam isso pior. Mesma decisão do claude-indicator. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- WinForms entra só pelo NotifyIcon da bandeja: o WPF não tem equivalente nativo. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyTitle>Gravador</AssemblyTitle>
+    <!-- WFO0003 manda configurar DPI pela propriedade do WinForms. Aqui não vale: isto é um app
+         WPF que só usa WinForms pelo NotifyIcon, e o DPI PRECISA estar no manifesto — a captura de
+         tela depende dele para pegar o retângulo certo num monitor com escala diferente, e a
+         propriedade do WinForms só age depois que o processo já subiu. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <Description>Grava o áudio do computador e do microfone para virar transcrição</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gravador.Core\Gravador.Core.csproj" />
+  </ItemGroup>
+
+</Project>
