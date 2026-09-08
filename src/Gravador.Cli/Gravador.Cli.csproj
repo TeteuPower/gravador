@@ -4,7 +4,10 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>Gravador.Cli</RootNamespace>
-    <AssemblyName>gravador</AssemblyName>
+    <!-- gravador-cli, e nao gravador: o Windows nao distingue maiusculas, entao `gravador.exe`
+         e `Gravador.exe` (a janela) sao o MESMO arquivo. Com nomes distintos os dois cabem na
+         mesma pasta e compartilham o runtime self-contained — 160 MB instalados em vez de 264. -->
+    <AssemblyName>gravador-cli</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>

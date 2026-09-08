@@ -1,0 +1,167 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Ler a versão
+        id: versao
+        shell: pwsh
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          "versao=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "versão $v"
+
+      - name: Compilar
+        shell: pwsh
+        run: dotnet build -c Release --nologo
+
+      # A interface é conferida aqui porque a esteira não tem ninguém olhando para a tela — e nem
+      # área de trabalho para capturar. O --render desenha por software; se o XAML não montar,
+      # medir ou pintar, isto falha antes de o instalador existir.
+      - name: Verificar que a interface desenha
+        shell: pwsh
+        run: |
+          $exe = "src\Gravador.App\bin\Release\net10.0-windows\Gravador.exe"
+          & $exe --render "$env:RUNNER_TEMP\telas"
+          if ($LASTEXITCODE -ne 0) { throw "o modo --render falhou" }
+          $png = Get-ChildItem "$env:RUNNER_TEMP\telas\*.png"
+          if ($png.Count -lt 4) { throw "esperava 4 imagens, saíram $($png.Count)" }
+          $png | ForEach-Object { Write-Host "$($_.Name)  $([math]::Round($_.Length/1KB,1)) KB" }
+
+      - name: Enviar as telas como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gravador-telas
+          path: ${{ runner.temp }}/telas/*.png
+          if-no-files-found: error
+
+      # Self-contained: a ferramenta precisa abrir em máquina sem o .NET instalado.
+      #
+      # Os dois executáveis vão para a MESMA pasta e compartilham o runtime — 157 MB instalados
+      # contra 264 MB se cada um levasse o seu (que é o que acontece com arquivo único). É também
+      # por isso que a linha de comando se chama `gravador-cli` e não `gravador`: o Windows não
+      # distingue maiúsculas, e `gravador.exe` seria o mesmo arquivo que `Gravador.exe`.
+      - name: Publicar a aplicação
+        shell: pwsh
+        run: |
+          dotnet publish src/Gravador.App -c Release -r win-x64 --self-contained -o publish
+          dotnet publish src/Gravador.Cli -c Release -r win-x64 --self-contained -o publish
+          if (-not (Test-Path publish/Gravador.exe)) { throw "Gravador.exe nao foi publicado" }
+          if (-not (Test-Path publish/gravador-cli.exe)) { throw "gravador-cli.exe nao foi publicado" }
+
+      # A imagem do runner não traz o Inno Setup; mesmo passo do claude-indicator.
+      - name: Instalar o Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Gerar o instalador (Inno Setup)
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersao=${{ steps.versao.outputs.versao }} installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "o Inno Setup falhou" }
+
+      - name: Publicar o instalador como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gravador-instalador
+          path: Output/Gravador-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Publicar o modo linha de comando como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gravador-cli
+          path: publish/gravador-cli.exe
+          if-no-files-found: error
+
+      # Todo push na main atualiza a pré-release "latest": o instalador do último commit fica sempre
+      # disponível na caixa Releases da página inicial do repositório (mesmo esquema do Limpador).
+      - name: Atualizar a release "latest"
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $setup = (Get-ChildItem Output\Gravador-Setup-*.exe | Select-Object -First 1).FullName
+          $versao = '${{ steps.versao.outputs.versao }}'
+          $titulo = "Build $versao (main)"
+          $notas = "Instalador gerado automaticamente a partir do ultimo commit na main (versao $versao). Para versoes estaveis, use as releases numeradas."
+
+          function Invoke-Gh {
+            param([string[]]$GhArgs, [int]$Tentativas = 3)
+            for ($i = 1; $i -le $Tentativas; $i++) {
+              $saida = & gh @GhArgs 2>&1
+              if ($LASTEXITCODE -eq 0) { return $true }
+              Write-Host "tentativa $i de ${Tentativas} falhou: $saida"
+              if ($i -lt $Tentativas) { Start-Sleep -Seconds (5 * $i) }
+            }
+            return $false
+          }
+
+          $existe = Invoke-Gh @('release', 'view', 'latest', '--json', 'tagName') -Tentativas 2
+
+          if (-not $existe) {
+            Write-Host "criando a release latest"
+            if (-not (Invoke-Gh @('release', 'create', 'latest', $setup, '--prerelease', '--title', $titulo, '--notes', $notas))) {
+              Write-Host "create nao passou; tentando atualizar no lugar"
+              $existe = $true
+            }
+          }
+
+          if ($existe) {
+            if (-not (Invoke-Gh @('release', 'upload', 'latest', $setup, '--clobber'))) { throw "falha ao enviar o instalador" }
+          }
+
+          # o nome do arquivo carrega a versao: sem limpar, a release acumula um .exe por build
+          $atual = Split-Path $setup -Leaf
+          $nomes = & gh release view latest --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -eq 0) {
+            foreach ($nome in $nomes) {
+              if ($nome -and $nome -ne $atual -and $nome -like 'Gravador-Setup-*.exe') {
+                Write-Host "removendo instalador antigo: $nome"
+                if (-not (Invoke-Gh @('release', 'delete-asset', 'latest', $nome, '--yes') -Tentativas 2)) {
+                  Write-Host "::warning::nao consegui remover $nome"
+                }
+              }
+            }
+          }
+
+          if ($existe) {
+            if (-not (Invoke-Gh @('release', 'edit', 'latest', '--title', $titulo, '--notes', $notas, '--prerelease') -Tentativas 2)) {
+              Write-Host "::warning::titulo da release nao atualizado"
+            }
+          }
+          Write-Host "release latest publicada com $atual"
+
+      # Só em tags v*: release numerada com o instalador anexado (link estável).
+      - name: Criar a release numerada
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $setup = (Get-ChildItem Output\Gravador-Setup-*.exe | Select-Object -First 1).FullName
+          gh release create $env:GITHUB_REF_NAME $setup `
+            --title "Gravador $env:GITHUB_REF_NAME" `
+            --generate-notes `
+            --latest
