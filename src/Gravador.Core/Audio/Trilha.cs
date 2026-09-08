@@ -76,6 +76,14 @@ internal sealed class Trilha : IDisposable
     /// <summary>Verdadeiro quando o que vier agora não deve entrar no arquivo misturado.</summary>
     public Func<bool>? SilenciarNaMixagem { get; set; }
 
+    /// <summary>
+    /// Derivação do áudio para quem só quer ESCUTAR — hoje, a transcrição ao vivo.
+    ///
+    /// Recebe o mesmo vetor que vai para o arquivo, com o ganho já aplicado, e o instante do começo
+    /// do trecho. O vetor é reaproveitado a cada buffer: quem guardar precisa copiar.
+    /// </summary>
+    public Action<float[], int, TimeSpan>? ParaEscuta { get; set; }
+
     public event Action<string, Exception>? Falhou;
 
     public void Iniciar()
@@ -162,6 +170,20 @@ internal sealed class Trilha : IDisposable
                 _wav?.EscreverSilencio(restantes / _canais);
             else
                 EscreverComDeslocamento(buffer, deslocamento, restantes);
+
+            // A escuta recebe o áudio como ele foi capturado, mesmo em trecho mudo: a transcrição
+            // ao vivo é justamente onde interessa saber o que você falou sem a reunião ouvir.
+            if (ParaEscuta is { } escuta)
+            {
+                var em = TimeSpan.FromSeconds((double)posicao / _taxa);
+                if (deslocamento == 0) escuta(buffer, restantes, em);
+                else
+                {
+                    var copia = new float[restantes];
+                    Array.Copy(buffer, deslocamento, copia, 0, restantes);
+                    escuta(copia, restantes, em);
+                }
+            }
 
             if (ParaMixagem is { } mix && SilenciarNaMixagem?.Invoke() != true)
             {

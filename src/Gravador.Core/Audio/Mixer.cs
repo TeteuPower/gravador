@@ -101,13 +101,20 @@ public sealed class Mixer : IDisposable
         _inicioAbsoluto += quadros;
     }
 
-    /// <summary>Drena tudo o que sobrou e fecha o arquivo.</summary>
+    /// <summary>
+    /// Drena até o instante final e fecha o arquivo.
+    ///
+    /// O laço existe porque uma drenagem só cobre, no máximo, o tamanho do acumulador: parar uma
+    /// gravação com vários segundos ainda represados precisa de mais de uma volta. E o limite é
+    /// <paramref name="ateQuadro"/>, nunca o fim do acumulador — despejar o resto dele acrescentaria
+    /// ao arquivo misturado os segundos de zeros que ainda não tinham sido usados, e ele terminaria
+    /// mais longo que as trilhas separadas.
+    /// </summary>
     public void Finalizar(long ateQuadro)
     {
         lock (_trava)
         {
-            DrenarInterno(ateQuadro);
-            DrenarInterno(_inicioAbsoluto + _quadrosNoBuffer);
+            while (_inicioAbsoluto < ateQuadro) DrenarInterno(ateQuadro);
         }
         _wav.Dispose();
     }

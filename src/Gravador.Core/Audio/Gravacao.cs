@@ -62,6 +62,13 @@ public sealed class Gravacao : IDisposable
     public string? FormatoSistema => _sistema?.FormatoDaOrigem;
     public string? FormatoMicrofone => _microfone?.FormatoDaOrigem;
 
+    /// <summary>
+    /// Derivação do áudio capturado, por trilha, para a transcrição ao vivo. Definir ANTES de
+    /// <see cref="Iniciar"/>; o vetor recebido é reaproveitado e precisa ser copiado por quem guarda.
+    /// </summary>
+    public Action<float[], int, TimeSpan>? EscutaSistema { get; set; }
+    public Action<float[], int, TimeSpan>? EscutaMicrofone { get; set; }
+
     // ==================================================================
 
     /// <summary>
@@ -121,6 +128,9 @@ public sealed class Gravacao : IDisposable
                 if (_sistema == null && _microfone == null)
                     throw new InvalidOperationException(
                         "Nenhum dispositivo de áudio pôde ser aberto. Confira as configurações de som do Windows.");
+
+                if (_sistema != null) _sistema.ParaEscuta = EscutaSistema;
+                if (_microfone != null) _microfone.ParaEscuta = EscutaMicrofone;
 
                 if (mixarDeVerdade && _sistema != null && _microfone != null)
                 {

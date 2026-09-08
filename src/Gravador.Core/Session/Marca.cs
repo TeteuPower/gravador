@@ -41,17 +41,7 @@ public sealed record Marca(
     [JsonIgnore] public TimeSpan Em => TimeSpan.FromSeconds(EmSegundos);
 
     /// <summary>Carimbo legível: mm:ss até uma hora, depois h:mm:ss.</summary>
-    [JsonIgnore]
-    public string Carimbo
-    {
-        get
-        {
-            var t = Em;
-            return t.TotalHours >= 1
-                ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
-                : $"{t.Minutes:00}:{t.Seconds:00}";
-        }
-    }
+    [JsonIgnore] public string Carimbo => Formato.Carimbo(Em);
 
     [JsonIgnore]
     public string Rotulo => Tipo switch
