@@ -1,0 +1,24 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+artifacts/
+publish/
+
+# Gravações: nunca versionadas. Ficam em %LOCALAPPDATA%\Gravador\sessoes,
+# mas quem aponta a pasta de saída para dentro do repositório não deve sujá-lo.
+sessoes/
+gravacoes/
+*.wav
+*.mp3
+*.m4a
+
+# IDE
+.idea/
+*.code-workspace
+
+# Instalador
+Output/

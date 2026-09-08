@@ -1,0 +1,16 @@
+# O repositório guarda tudo em LF; o checkout no Windows pode usar CRLF à vontade.
+* text=auto eol=lf
+
+# Fonte que o Visual Studio reescreve em CRLF de qualquer jeito.
+*.csproj text eol=crlf
+*.slnx   text eol=crlf
+*.xaml   text eol=crlf
+*.cmd    text eol=crlf
+
+# Binários: nunca normalizar.
+*.ico  binary
+*.png  binary
+*.jpg  binary
+*.wav  binary
+*.mp3  binary
+*.m4a  binary

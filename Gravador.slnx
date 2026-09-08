@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Gravador.App/Gravador.App.csproj" />
+    <Project Path="src/Gravador.Cli/Gravador.Cli.csproj" />
+    <Project Path="src/Gravador.Core/Gravador.Core.csproj" />
+  </Folder>
+</Solution>

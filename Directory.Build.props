@@ -1,0 +1,29 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <!-- A versão vive no arquivo VERSION, na raiz: um lugar só, lido por todos os projetos e
+         pela esteira de build. -->
+    <GravadorVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</GravadorVersion>
+    <Version>$(GravadorVersion)</Version>
+    <FileVersion>$(GravadorVersion).0</FileVersion>
+    <AssemblyVersion>$(GravadorVersion).0</AssemblyVersion>
+
+    <Product>Gravador</Product>
+    <Company>TeteuPower</Company>
+    <Authors>Matheus Tavares</Authors>
+
+    <!-- Ferramenta que fica ligada durante uma reunião inteira num notebook modesto: o GC de
+         estação de trabalho concorrente é o que menos rouba CPU de quem está na chamada. O GC de
+         servidor (usado no Limpador, que varre disco em dezenas de threads) faria o contrário. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredCompilationQuickStartupJit>true</TieredCompilationQuickStartupJit>
+  </PropertyGroup>
+
+</Project>
