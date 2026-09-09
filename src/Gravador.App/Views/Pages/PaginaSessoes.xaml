@@ -1,6 +1,7 @@
 <UserControl x:Class="Gravador.App.Views.Pages.PaginaSessoes"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AllowDrop="True" Drop="AoSoltar" DragOver="AoArrastar">
     <Grid Margin="28,24,28,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -16,10 +17,24 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                     <Button Content="Abrir a pasta" Click="AoAbrirPastaRaiz" Style="{StaticResource BotaoDiscreto}"/>
                     <Button Content="Atualizar" Click="AoAtualizar" Margin="8,0,0,0"/>
+                    <Button Content="Importar áudio ou vídeo..." Click="AoImportar" Margin="8,0,0,0"
+                            Background="{StaticResource Acento}" BorderBrush="{StaticResource Acento}" Foreground="#12141C"/>
                 </StackPanel>
             </Grid>
+
+            <!-- Importação em andamento: uma linha só, que se sobrescreve, com o que está acontecendo. -->
+            <Border x:Name="CartaoImportacao" Style="{StaticResource Cartao}" Margin="0,16,8,0" Visibility="Collapsed"
+                    BorderBrush="{StaticResource Acento}">
+                <StackPanel>
+                    <TextBlock x:Name="TxtImportacaoTitulo" FontWeight="SemiBold" Text="Importando..."/>
+                    <TextBlock x:Name="TxtImportacaoEtapa" Style="{StaticResource Fraco}" Margin="0,6,0,0"/>
+                    <TextBlock x:Name="TxtImportacaoAviso" Style="{StaticResource Fraco}" Margin="0,4,0,0"
+                               Foreground="{StaticResource Aviso}" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+
             <TextBlock x:Name="TxtVazio" Style="{StaticResource Fraco}" Margin="0,24,0,0" Visibility="Collapsed"
-                       Text="Nenhuma gravação ainda. Volte para a aba Gravar e aperte Gravar — ou use o atalho, sem sair da reunião."/>
+                       Text="Nenhuma gravação ainda. Grave uma reunião na aba Gravar, ou arraste um MP4/MP3 para esta janela para importar."/>
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0">
@@ -38,6 +53,8 @@
                                                 Tag="{Binding Pasta}" Click="AoAbrirPasta"/>
                                         <Button Content="{Binding TextoDoBotaoResumo}" Margin="8,0,0,0"
                                                 Tag="{Binding Pasta}" Click="AoResumir"/>
+                                        <Button Content="Abrir" Margin="8,0,0,0" Tag="{Binding Pasta}" Click="AoAbrirSessao"
+                                                Background="{StaticResource SuperficieAlta}" FontWeight="SemiBold"/>
                                     </StackPanel>
                                 </Grid>
                                 <TextBlock Text="{Binding Conteudo}" Style="{StaticResource Fraco}" Margin="0,10,0,0"/>

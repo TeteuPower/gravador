@@ -37,6 +37,12 @@ public interface ITranscritorAoVivo : ITranscritor
 /// <summary>Transcreve o arquivo pronto, depois que a gravação termina.</summary>
 public interface ITranscritorDeArquivo : ITranscritor
 {
+    /// <summary>Idioma da fala ("en", "pt-BR"). Vazio ou "auto" deixa o motor detectar, quando ele sabe.</summary>
+    string IdiomaPedido { get; set; }
+
+    /// <summary>O que o motor concluiu sobre o idioma, depois de transcrever. Null se ele não detecta.</summary>
+    string? IdiomaDetectado { get; }
+
     Task<IReadOnlyList<TrechoFalado>> TranscreverAsync(string arquivo, string fonte,
         IProgress<string>? etapa, CancellationToken ct);
 }
@@ -49,10 +55,10 @@ public interface ITranscritorDeArquivo : ITranscritor
 /// ferramenta é o passo seguinte, que é onde ele é bom: ler a transcrição junto com as capturas de
 /// tela e devolver o resumo, as decisões e as pendências (ver <see cref="Claude.Analista"/>).
 ///
-/// Quem quiser transcrição de verdade em português tem duas saídas aqui, e elas trocam CPU por
-/// qualidade: o reconhecedor do próprio Windows (offline, de graça, medíocre) ou um serviço
-/// compatível com a API da OpenAI (Whisper e afins — excelente em português, roda fora da máquina,
-/// custa por minuto).
+/// Quatro motores, e eles trocam CPU, dinheiro e download por qualidade: o reconhecedor do Windows
+/// (offline, de graça, medíocre, e só nos idiomas com pacote de fala instalado), um serviço
+/// compatível com a API da OpenAI (excelente, roda fora, custa por minuto), e o whisper.cpp local
+/// (excelente em inglês, bom em português, de graça, baixa 150 MB a 1,5 GB de modelo uma vez).
 /// </summary>
 public static class Transcritores
 {
@@ -62,9 +68,21 @@ public static class Transcritores
         _ => null,
     };
 
-    public static ITranscritorDeArquivo? DeArquivo(AppSettings config) => config.Transcricao switch
+    public static ITranscritorDeArquivo? DeArquivo(AppSettings config) => DeArquivo(config, config.Transcricao);
+
+    public static ITranscritorDeArquivo? DeArquivo(AppSettings config, MotorTranscricao motor) => motor switch
     {
         MotorTranscricao.Remoto => new RemotoTranscritor(config),
+        MotorTranscricao.Whisper => new WhisperTranscritor(config),
+        MotorTranscricao.Windows => new WindowsTranscritorDeArquivo(config),
         _ => null,
     };
+
+    /// <summary>"pt-BR" → "pt". Os motores de fala falam em código de duas letras.</summary>
+    public static string CodigoCurto(string idioma)
+    {
+        if (string.IsNullOrWhiteSpace(idioma) || idioma.Equals("auto", StringComparison.OrdinalIgnoreCase)) return "auto";
+        var i = idioma.IndexOf('-');
+        return (i > 0 ? idioma[..i] : idioma).ToLowerInvariant();
+    }
 }

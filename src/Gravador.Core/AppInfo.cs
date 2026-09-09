@@ -26,6 +26,15 @@ public static class AppInfo
     public static string PastaSessoesPadrao { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Nome);
 
+    /// <summary>
+    /// Ferramentas baixadas sob demanda (ffmpeg, whisper, modelos): %LOCALAPPDATA%\Gravador\ferramentas.
+    ///
+    /// LOCAL e não Roaming porque são centenas de megabytes de binário de máquina — não fazem
+    /// sentido num perfil que viaja, e o OneDrive não tem por que sincronizá-los.
+    /// </summary>
+    public static string PastaFerramentas { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Nome, "ferramentas");
+
     public static void GarantirPastas()
     {
         Directory.CreateDirectory(PastaDados);

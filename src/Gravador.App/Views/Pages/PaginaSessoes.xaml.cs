@@ -5,16 +5,20 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Gravador.Core;
+using Gravador.Core.Importacao;
 using Gravador.Core.Session;
+using Gravador.Core.Settings;
 
 namespace Gravador.App.Views.Pages;
 
 public partial class PaginaSessoes : UserControl
 {
     private readonly ObservableCollection<ItemDeSessao> _itens = new();
+    private bool _importando;
 
     public PaginaSessoes()
     {
@@ -46,11 +50,25 @@ public partial class PaginaSessoes : UserControl
         if ((sender as FrameworkElement)?.Tag is string pasta) Abrir(pasta);
     }
 
+    private void AoAbrirSessao(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not string pasta) return;
+        var sessao = SessaoGravacao.Abrir(pasta);
+        if (sessao == null) return;
+        AbrirJanela(sessao);
+    }
+
+    private void AbrirJanela(SessaoGravacao sessao)
+    {
+        var janela = new JanelaSessao(sessao) { Owner = Window.GetWindow(this) };
+        janela.Show();
+    }
+
     private static void Abrir(string caminho)
     {
         try
         {
-            Directory.CreateDirectory(caminho);
+            if (!File.Exists(caminho)) Directory.CreateDirectory(caminho);
             Process.Start(new ProcessStartInfo(caminho) { UseShellExecute = true });
         }
         catch (Exception ex)
@@ -58,6 +76,91 @@ public partial class PaginaSessoes : UserControl
             MessageBox.Show("Não deu para abrir: " + ex.Message, AppInfo.Nome);
         }
     }
+
+    // ==================================================================
+
+    private static readonly string[] ExtensoesAceitas =
+        [".mp4", ".mkv", ".mov", ".webm", ".avi", ".wmv", ".m4v", ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac", ".wma"];
+
+    private void AoImportar(object sender, RoutedEventArgs e)
+    {
+        var dialogo = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Importar uma gravação",
+            Filter = "Áudio e vídeo|*.mp4;*.mkv;*.mov;*.webm;*.avi;*.wmv;*.m4v;*.mp3;*.m4a;*.wav;*.aac;*.ogg;*.flac;*.wma|Todos os arquivos|*.*",
+            Multiselect = true,
+        };
+        if (dialogo.ShowDialog() == true) _ = ImportarVariosAsync(dialogo.FileNames);
+    }
+
+    private void AoArrastar(object sender, DragEventArgs e)
+    {
+        var ok = !_importando && e.Data.GetDataPresent(DataFormats.FileDrop)
+                 && e.Data.GetData(DataFormats.FileDrop) is string[] arquivos
+                 && arquivos.Any(a => ExtensoesAceitas.Contains(Path.GetExtension(a).ToLowerInvariant()));
+        e.Effects = ok ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void AoSoltar(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] arquivos) return;
+        var aceitos = arquivos.Where(a => ExtensoesAceitas.Contains(Path.GetExtension(a).ToLowerInvariant())).ToArray();
+        if (aceitos.Length > 0) _ = ImportarVariosAsync(aceitos);
+    }
+
+    private async Task ImportarVariosAsync(IEnumerable<string> arquivos)
+    {
+        if (_importando) return;
+        _importando = true;
+        CartaoImportacao.Visibility = Visibility.Visible;
+        TxtImportacaoAviso.Visibility = Visibility.Collapsed;
+
+        try
+        {
+            foreach (var arquivo in arquivos)
+            {
+                TxtImportacaoTitulo.Text = "Importando " + Path.GetFileName(arquivo);
+                TxtImportacaoEtapa.Text = "Começando...";
+
+                var importador = new ImportadorDeMidia(App.Config);
+                importador.Aviso += a => Dispatcher.Invoke(() =>
+                {
+                    TxtImportacaoAviso.Text = a;
+                    TxtImportacaoAviso.Visibility = Visibility.Visible;
+                });
+
+                // Whisper local por padrão, idioma detectado, tradução quando o idioma for outro. É o
+                // caminho que funciona sem chave nenhuma; a primeira vez baixa ferramenta e modelo.
+                var opcoes = new OpcoesDeImportacao
+                {
+                    Motor = App.Config.Transcricao is MotorTranscricao.Remoto ? MotorTranscricao.Remoto : MotorTranscricao.Whisper,
+                    Idioma = "auto",
+                    Traduzir = App.Config.TraduzirQuandoIdiomaDiferente,
+                    Resumir = App.Config.ResumirAoFinal,
+                };
+
+                try
+                {
+                    var sessao = await importador.ImportarAsync(arquivo, opcoes, new Progress<string>(t => TxtImportacaoEtapa.Text = t));
+                    Recarregar();
+                    AbrirJanela(sessao);
+                }
+                catch (Exception ex)
+                {
+                    TxtImportacaoEtapa.Text = "Não deu: " + ex.Message;
+                    await Task.Delay(4000);
+                }
+            }
+        }
+        finally
+        {
+            _importando = false;
+            CartaoImportacao.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    // ==================================================================
 
     /// <summary>
     /// Gera o resumo desta sessão (ou abre o que já existe).
@@ -126,7 +229,9 @@ public partial class PaginaSessoes : UserControl
 
         public string Detalhe =>
             $"{_sessao.Inicio.LocalDateTime:dd/MM/yyyy 'às' HH:mm} · {Formato.Duracao(_sessao.Duracao)} · "
-            + Formato.Tamanho(_sessao.BytesEmDisco());
+            + Formato.Tamanho(_sessao.BytesEmDisco())
+            + (_sessao.Origem == OrigemDaSessao.Importada ? " · importada" : "")
+            + (string.IsNullOrEmpty(_sessao.Idioma) ? "" : $" · {_sessao.Idioma}");
 
         public string Conteudo
         {
@@ -134,9 +239,11 @@ public partial class PaginaSessoes : UserControl
             {
                 var partes = new List<string>();
                 foreach (var a in _sessao.Arquivos.Todos) partes.Add(a);
-                if (_sessao.QuantidadeDeCapturas > 0) partes.Add($"{_sessao.QuantidadeDeCapturas} captura(s) de tela");
+                if (_sessao.QuantidadeDeCapturas > 0) partes.Add($"{_sessao.QuantidadeDeCapturas} imagem(ns)");
                 if (_sessao.QuantidadeDeMarcadores > 0) partes.Add($"{_sessao.QuantidadeDeMarcadores} marcador(es)");
                 if (_sessao.Falas.Count > 0) partes.Add("transcrição");
+                if (_sessao.TemTraducao) partes.Add("tradução");
+                if (_sessao.Capitulos.Count > 0) partes.Add($"{_sessao.Capitulos.Count} capítulo(s)");
                 if (_sessao.TrechosMudos.Count > 0)
                 {
                     var total = TimeSpan.FromSeconds(_sessao.TrechosMudos.Sum(t => t.Duracao.TotalSeconds));

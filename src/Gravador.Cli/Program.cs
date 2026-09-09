@@ -17,7 +17,7 @@ namespace Gravador.Cli;
 /// (e pelo modo `ipc`) que elas vão falar com ela, do mesmo jeito que o app do Limpador fala com o
 /// motor de varredura dele.
 /// </summary>
-internal static class Program
+internal static partial class Program
 {
     private static int Main(string[] argv)
     {
@@ -52,6 +52,13 @@ internal static class Program
             "resumir" => Resumir(resto).GetAwaiter().GetResult(),
             "conta" => Conta(),
             "entrar" => Entrar(resto).GetAwaiter().GetResult(),
+            "importar" => Importar(resto).GetAwaiter().GetResult(),
+            "quadros" => Quadros(resto).GetAwaiter().GetResult(),
+            "transcrever" => Transcrever(resto).GetAwaiter().GetResult(),
+            "traduzir" => Traduzir(resto).GetAwaiter().GetResult(),
+            "ferramentas" => FerramentasStatus(resto).GetAwaiter().GetResult(),
+            "mcp" => Mcp(resto).GetAwaiter().GetResult(),
+            "conversar" => Conversar(resto).GetAwaiter().GetResult(),
             "ajuda" or "--ajuda" or "-h" or "--help" => Ajuda(),
             _ => Desconhecido(comando),
         };
@@ -78,6 +85,14 @@ internal static class Program
               gravador entrar [--manual]       entra com a conta Claude
               gravador ipc                     modo de integração (JSON por linha)
 
+              gravador importar <arquivo>      vira sessão: áudio, slides, transcrição, tradução
+              gravador transcrever <pasta>     transcreve (ou refaz) uma sessão já existente
+              gravador traduzir <pasta>        traduz a transcrição com o Claude
+              gravador quadros --video <mp4> --saida <pasta>   só o funil de slides, para calibrar
+              gravador ferramentas [--baixar]  estado do ffmpeg, whisper e modelo
+              gravador conversar <pasta> "pergunta"   pergunta ao Claude sobre a sessao
+              gravador mcp --sessao <pasta>    servidor MCP da sessao (o claude nos chama assim)
+
             OPÇÕES DE `gravar`
               --segundos N        para sozinho depois de N segundos
               --saida PASTA       onde criar a pasta da sessão
@@ -86,6 +101,12 @@ internal static class Program
               --wav               deixa em WAV, sem converter para MP3
               --kbps N            taxa do MP3 (padrão: {new AppSettings().Mp3Kbps})
               --titulo TEXTO      nome da sessão
+
+            OPÇÕES DE `importar`
+              --motor whisper|windows|remoto|nenhum   quem transcreve (padrão: whisper)
+              --idioma auto|en|pt-BR   idioma da fala (padrão: detecta)
+              --modelo base|small|medium   modelo do whisper (padrão: base)
+              --titulo TEXTO   --sem-quadros   --sem-transcricao   --sem-traducao   --resumir
 
             A configuração completa fica em {Path.Combine(AppInfo.PastaDados, "config.json")}
             e é a mesma que a janela do Gravador usa.

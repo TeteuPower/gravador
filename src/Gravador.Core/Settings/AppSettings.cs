@@ -61,6 +61,13 @@ public enum MotorTranscricao
 
     /// <summary>Serviço remoto compatível com a API de transcrição da OpenAI (Whisper, Groq...).</summary>
     Remoto,
+
+    /// <summary>
+    /// whisper.cpp local, baixado sob demanda. Roda depois da gravação, sobre o arquivo — não ao
+    /// vivo, porque em máquina modesta ele disputaria a CPU com a reunião. Excelente em inglês, bom
+    /// em português, de graça, offline.
+    /// </summary>
+    Whisper,
 }
 
 public enum FonteCredencialClaude
@@ -176,6 +183,40 @@ public sealed class AppSettings
     /// <summary>Nome da variável de ambiente com a chave. A chave em si nunca entra neste arquivo.</summary>
     public string RemotoChaveEnv { get; set; } = "OPENAI_API_KEY";
 
+    /// <summary>
+    /// Modelo ggml do whisper.cpp: base (147 MB, razoável), small (487 MB, bom), medium (1,5 GB, o
+    /// melhor que cabe numa CPU). Baixado sob demanda na primeira transcrição.
+    /// </summary>
+    public string WhisperModelo { get; set; } = "base";
+
+    /// <summary>Threads do whisper. 0 = metade dos núcleos lógicos, para a máquina continuar usável.</summary>
+    public int WhisperThreads { get; set; }
+
+    // ---------------- Tradução ----------------
+
+    /// <summary>Idioma para o qual a transcrição é traduzida quando o original é outro.</summary>
+    public string IdiomaDestino { get; set; } = "pt-BR";
+
+    /// <summary>Traduzir automaticamente no pós-processamento quando o idioma detectado difere do destino.</summary>
+    public bool TraduzirQuandoIdiomaDiferente { get; set; } = true;
+
+    // ---------------- Importação de vídeo ----------------
+
+    /// <summary>Quadros amostrados por segundo do vídeo, para a análise. 1 é o que basta para slide.</summary>
+    public double ImportacaoQuadrosPorSegundo { get; set; } = 1;
+
+    /// <summary>Largura das miniaturas de análise. 640 px é o suficiente para achar cortes e retângulos.</summary>
+    public int ImportacaoLarguraMiniatura { get; set; } = 640;
+
+    /// <summary>Largura máxima do quadro final entregue (o slide recortado).</summary>
+    public int ImportacaoLarguraQuadroFinal { get; set; } = 1920;
+
+    /// <summary>Recortar os quadros finais no retângulo do conteúdo (a janela da apresentação).</summary>
+    public bool ImportacaoRecortarNoConteudo { get; set; } = true;
+
+    /// <summary>Guardar as miniaturas de análise depois de importar. Custa ~60 MB por hora de vídeo.</summary>
+    public bool ImportacaoManterMiniaturas { get; set; }
+
     // ---------------- Claude ----------------
 
     public FonteCredencialClaude FonteClaude { get; set; } = FonteCredencialClaude.Automatica;
@@ -268,5 +309,11 @@ public sealed class AppSettings
         LimiarVozDb = Math.Clamp(LimiarVozDb, -80, -10);
         if (!GravarSistema && !GravarMicrofone) GravarSistema = true;
         AtalhosDeMudoExtras ??= new List<string>();
+        if (WhisperModelo is not ("tiny" or "base" or "small" or "medium" or "large-v3-turbo")) WhisperModelo = "base";
+        WhisperThreads = Math.Clamp(WhisperThreads, 0, 64);
+        ImportacaoQuadrosPorSegundo = Math.Clamp(ImportacaoQuadrosPorSegundo, 0.2, 5);
+        ImportacaoLarguraMiniatura = Math.Clamp(ImportacaoLarguraMiniatura, 320, 1280);
+        ImportacaoLarguraQuadroFinal = Math.Clamp(ImportacaoLarguraQuadroFinal, 640, 3840);
+        if (string.IsNullOrWhiteSpace(IdiomaDestino)) IdiomaDestino = "pt-BR";
     }
 }

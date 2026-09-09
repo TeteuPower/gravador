@@ -219,6 +219,18 @@
                         <TextBlock x:Name="TxtChaveEstado" Style="{StaticResource Dica}" Margin="0,8,0,0"/>
                     </StackPanel>
 
+                    <StackPanel x:Name="PainelWhisper" Visibility="Collapsed">
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Modelo do whisper" Style="{StaticResource Rotulo}"/>
+                            <ComboBox Grid.Column="1" x:Name="CmbWhisperModelo"/>
+                        </Grid>
+                        <TextBlock x:Name="TxtWhisperEstado" Style="{StaticResource Dica}"/>
+                    </StackPanel>
+
                     <CheckBox x:Name="ChkAoVivo" Content="Transcrever enquanto grava" Margin="0,8,0,0"/>
                     <Grid Margin="0,6,0,0">
                         <Grid.ColumnDefinitions>
@@ -228,6 +240,26 @@
                         <TextBlock Grid.Column="0" Text="Idioma" Style="{StaticResource Rotulo}"/>
                         <ComboBox Grid.Column="1" x:Name="CmbIdioma" MinWidth="150" IsEditable="True"/>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= Importação ================= -->
+            <Border Style="{StaticResource Cartao}">
+                <StackPanel>
+                    <TextBlock Text="Importação de vídeo" FontWeight="SemiBold" FontSize="14"/>
+                    <TextBlock Style="{StaticResource Dica}" Margin="0,6,0,10"
+                               Text="Um MP4 de gravação de tela vira sessão: o áudio sai pelo Windows (segundos), o vídeo é amostrado a 1 quadro por segundo pelo ffmpeg e reduzido, em código, aos slides — descartando o que não era a apresentação. O ffmpeg (111 MB) é baixado na primeira importação."/>
+                    <CheckBox x:Name="ChkRecortar" Content="Recortar os slides no retângulo da apresentação (em vez da tela inteira)"/>
+                    <CheckBox x:Name="ChkManterMiniaturas" Content="Guardar as miniaturas de análise (~60 MB por hora de vídeo)"/>
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Traduzir para" Style="{StaticResource Rotulo}"/>
+                        <ComboBox Grid.Column="1" x:Name="CmbIdiomaDestino" MinWidth="150" IsEditable="True"/>
+                    </Grid>
+                    <CheckBox x:Name="ChkTraduzir" Content="Traduzir automaticamente quando a fala estiver em outro idioma" Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>
 

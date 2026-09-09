@@ -69,6 +69,14 @@ public sealed record TrechoMudo(
     [JsonIgnore] public TimeSpan Duracao => TimeSpan.FromSeconds(Math.Max(0, AteSegundos - DeSegundos));
 }
 
+/// <summary>Um capítulo: um ponto nomeado da linha do tempo, definido por você ou pelo Claude.</summary>
+public sealed record Capitulo(
+    [property: JsonPropertyName("em")] double EmSegundos,
+    [property: JsonPropertyName("titulo")] string Titulo)
+{
+    [JsonIgnore] public string Carimbo => Formato.Carimbo(EmSegundos);
+}
+
 /// <summary>Um pedaço de fala transcrito.</summary>
 public sealed record TrechoFalado(
     [property: JsonPropertyName("de")] double DeSegundos,

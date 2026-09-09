@@ -36,6 +36,7 @@ public partial class PaginaConfiguracoes : UserControl
         CmbKbps.SelectionChanged += (_, _) => AtualizarEstimativa();
         CmbTrilhas.SelectionChanged += (_, _) => AtualizarEstimativa();
         CmbTranscricao.SelectionChanged += (_, _) => AtualizarTranscricao();
+        CmbWhisperModelo.SelectionChanged += (_, _) => AtualizarTranscricao();
         ChkDetectarApps.Checked += (_, _) => AtualizarAppsVigiados();
         ChkDetectarApps.Unchecked += (_, _) => AtualizarAppsVigiados();
 
@@ -100,7 +101,17 @@ public partial class PaginaConfiguracoes : UserControl
             new Opcao<MotorTranscricao>(MotorTranscricao.Nenhum, "Nenhuma — só o áudio e as imagens"),
             new Opcao<MotorTranscricao>(MotorTranscricao.Windows, "Reconhecimento de fala do Windows"),
             new Opcao<MotorTranscricao>(MotorTranscricao.Remoto, "Serviço remoto (compatível com a API da OpenAI)"),
+            new Opcao<MotorTranscricao>(MotorTranscricao.Whisper, "whisper.cpp local — offline, de graça, baixa o modelo uma vez"),
         };
+
+        CmbWhisperModelo.ItemsSource = new[]
+        {
+            new Opcao<string>("base", "base — 148 MB, razoável, rápido (7× tempo real na CPU)"),
+            new Opcao<string>("small", "small — 488 MB, bom"),
+            new Opcao<string>("medium", "medium — 1,5 GB, o melhor que cabe numa CPU"),
+        };
+
+        CmbIdiomaDestino.ItemsSource = new[] { "pt-BR", "pt-PT", "en-US", "es-ES" };
 
         CmbIdioma.ItemsSource = new[] { "pt-BR", "pt-PT", "en-US", "es-ES" };
     }
@@ -143,7 +154,12 @@ public partial class PaginaConfiguracoes : UserControl
         TxtAtalhoMarcar.Text = c.AtalhoMarcar;
 
         Selecionar(CmbTranscricao, c.Transcricao);
+        Selecionar(CmbWhisperModelo, c.WhisperModelo);
         CmbIdioma.Text = c.IdiomaTranscricao;
+        CmbIdiomaDestino.Text = c.IdiomaDestino;
+        ChkTraduzir.IsChecked = c.TraduzirQuandoIdiomaDiferente;
+        ChkRecortar.IsChecked = c.ImportacaoRecortarNoConteudo;
+        ChkManterMiniaturas.IsChecked = c.ImportacaoManterMiniaturas;
         ChkAoVivo.IsChecked = c.TranscreverAoVivo;
         TxtRemotoUrl.Text = c.RemotoUrl;
         TxtRemotoModelo.Text = c.RemotoModelo;
@@ -224,7 +240,16 @@ public partial class PaginaConfiguracoes : UserControl
         var motor = Valor(CmbTranscricao, MotorTranscricao.Nenhum);
 
         PainelRemoto.Visibility = motor == MotorTranscricao.Remoto ? Visibility.Visible : Visibility.Collapsed;
+        PainelWhisper.Visibility = motor == MotorTranscricao.Whisper ? Visibility.Visible : Visibility.Collapsed;
         ChkAoVivo.IsEnabled = motor == MotorTranscricao.Windows;
+        if (motor == MotorTranscricao.Whisper)
+        {
+            var modelo = Valor(CmbWhisperModelo, "base");
+            var cli = Gravador.Core.Ferramentas.Ferramentas.WhisperCli.Disponivel;
+            var mod = Gravador.Core.Ferramentas.Ferramentas.ModeloWhisper(modelo).Disponivel;
+            TxtWhisperEstado.Text = cli && mod ? "whisper.cpp e o modelo já estão nesta máquina."
+                : $"Ainda não baixado: {(cli ? "" : "whisper.cpp (9 MB)")}{(cli || mod ? "" : " e ")}{(mod ? "" : $"modelo {modelo}")}. Baixa sozinho na primeira transcrição.";
+        }
 
         TxtTranscricaoDica.Text = motor switch
         {
@@ -235,6 +260,9 @@ public partial class PaginaConfiguracoes : UserControl
             MotorTranscricao.Remoto =>
                 "A melhor qualidade em português e a mais leve para a máquina: quem faz a conta é o "
                 + "servidor. Roda quando a gravação termina, em pedaços de dez minutos. Custa por minuto de áudio.",
+            MotorTranscricao.Whisper =>
+                "Roda nesta máquina depois da gravação, sem chave e sem custo. Excelente em inglês, bom em "
+                + "português. Medido: 48 min transcritos em 6m45s com o modelo base numa CPU comum.",
             _ => "A pasta da sessão fica pronta para você arrastar inteira para dentro de uma IA.",
         };
 
@@ -353,6 +381,11 @@ public partial class PaginaConfiguracoes : UserControl
         c.AtalhoMarcar = TxtAtalhoMarcar.Text;
 
         c.Transcricao = Valor(CmbTranscricao, MotorTranscricao.Nenhum);
+        c.WhisperModelo = Valor(CmbWhisperModelo, "base");
+        c.IdiomaDestino = string.IsNullOrWhiteSpace(CmbIdiomaDestino.Text) ? "pt-BR" : CmbIdiomaDestino.Text.Trim();
+        c.TraduzirQuandoIdiomaDiferente = ChkTraduzir.IsChecked == true;
+        c.ImportacaoRecortarNoConteudo = ChkRecortar.IsChecked == true;
+        c.ImportacaoManterMiniaturas = ChkManterMiniaturas.IsChecked == true;
         c.IdiomaTranscricao = string.IsNullOrWhiteSpace(CmbIdioma.Text) ? "pt-BR" : CmbIdioma.Text.Trim();
         c.TranscreverAoVivo = ChkAoVivo.IsChecked == true;
         c.RemotoUrl = TxtRemotoUrl.Text.Trim();

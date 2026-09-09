@@ -43,6 +43,7 @@ public sealed class RemotoTranscritor : ITranscritorDeArquivo
     public RemotoTranscritor(AppSettings config)
     {
         _config = config;
+        IdiomaPedido = config.IdiomaTranscricao;
         _chave = Environment.GetEnvironmentVariable(config.RemotoChaveEnv);
         if (string.IsNullOrWhiteSpace(_chave))
             Motivo = $"A variável de ambiente {config.RemotoChaveEnv} não está definida nesta máquina. "
@@ -54,6 +55,8 @@ public sealed class RemotoTranscritor : ITranscritorDeArquivo
     public string Nome => "Transcrição remota (compatível com OpenAI)";
     public bool Disponivel => Motivo == null;
     public string? Motivo { get; }
+    public string IdiomaPedido { get; set; }
+    public string? IdiomaDetectado { get; private set; }
 
     public async Task<IReadOnlyList<TrechoFalado>> TranscreverAsync(string arquivo, string fonte,
         IProgress<string>? etapa, CancellationToken ct)
@@ -184,7 +187,8 @@ public sealed class RemotoTranscritor : ITranscritorDeArquivo
         conteudo.Add(new StringContent("verbose_json"), "response_format");
 
         // O código de duas letras é o que estes serviços esperam; "pt-BR" é recusado por alguns.
-        var idioma = _config.IdiomaTranscricao.Split('-')[0];
+        // Sem idioma, o serviço detecta sozinho e devolve em "language".
+        var idioma = Transcritores.CodigoCurto(IdiomaPedido);
         if (idioma.Length == 2) conteudo.Add(new StringContent(idioma), "language");
 
         using var pedido = new HttpRequestMessage(HttpMethod.Post, _config.RemotoUrl) { Content = conteudo };
@@ -200,13 +204,16 @@ public sealed class RemotoTranscritor : ITranscritorDeArquivo
         return Ler(corpo, fonte, deslocamento);
     }
 
-    private static List<TrechoFalado> Ler(string json, string fonte, double deslocamento)
+    private List<TrechoFalado> Ler(string json, string fonte, double deslocamento)
     {
         var lista = new List<TrechoFalado>();
         try
         {
             using var doc = JsonDocument.Parse(json);
             var raiz = doc.RootElement;
+
+            if (IdiomaDetectado == null && raiz.TryGetProperty("language", out var lang) && lang.ValueKind == JsonValueKind.String)
+                IdiomaDetectado = lang.GetString();
 
             if (raiz.TryGetProperty("segments", out var segmentos) && segmentos.ValueKind == JsonValueKind.Array)
             {

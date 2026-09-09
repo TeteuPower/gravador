@@ -162,55 +162,20 @@ public sealed class ServicoDeGravacao : IDisposable
         _aoVivo?.Dispose();
         _aoVivo = null;
 
-        await TranscreverArquivosAsync(sessao, etapa, ct).ConfigureAwait(false);
+        // Ao vivo, o motor do Windows já deixou as falas; de arquivo, só Remoto e Whisper.
+        var motorDeArquivo = Config.Transcricao is MotorTranscricao.Remoto or MotorTranscricao.Whisper
+            ? Config.Transcricao
+            : (Config.Transcricao == MotorTranscricao.Windows && sessao.Falas.Count == 0 ? MotorTranscricao.Windows : (MotorTranscricao?)null);
 
-        Analista.GravarTranscricao(sessao);
-        sessao.Salvar();
-
-        if (Config.ResumirAoFinal)
+        await PosProcessamento.ExecutarAsync(sessao, Config, new PosProcessamento.Opcoes
         {
-            var resposta = await new Analista().ResumirAsync(sessao, Config, etapa, ct).ConfigureAwait(false);
-            if (!resposta.Ok && resposta.Erro != null)
-                Aviso?.Invoke("O resumo do Claude não saiu: " + resposta.Erro);
-        }
+            Motor = motorDeArquivo,
+            Idioma = Config.IdiomaTranscricao,
+            Traduzir = Config.TraduzirQuandoIdiomaDiferente,
+            Resumir = Config.ResumirAoFinal,
+        }, etapa, a => Aviso?.Invoke(a), ct).ConfigureAwait(false);
 
         return resultado;
-    }
-
-    /// <summary>
-    /// Transcrição de arquivo (o caminho remoto). Roda sobre a trilha que responde à pergunta certa:
-    /// a mixada, quando existe, porque é onde estão as duas pontas da conversa.
-    /// </summary>
-    private async Task TranscreverArquivosAsync(SessaoGravacao sessao, IProgress<string>? etapa, CancellationToken ct)
-    {
-        using var motor = Transcritores.DeArquivo(Config);
-        if (motor == null) return;
-
-        if (!motor.Disponivel)
-        {
-            Aviso?.Invoke(motor.Motivo ?? "A transcrição não está configurada.");
-            return;
-        }
-
-        var alvo = sessao.Arquivos.Mixado ?? sessao.Arquivos.Sistema ?? sessao.Arquivos.Microfone;
-        if (alvo == null) return;
-
-        var caminho = Path.Combine(sessao.Pasta, alvo);
-        var fonte = alvo.StartsWith("microfone", StringComparison.OrdinalIgnoreCase) ? "microfone" : "reunião";
-
-        try
-        {
-            var trechos = await motor.TranscreverAsync(caminho, fonte, etapa, ct).ConfigureAwait(false);
-            foreach (var t in trechos) sessao.AdicionarFala(t);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Aviso?.Invoke("A transcrição falhou: " + ex.Message);
-        }
     }
 
     /// <summary>Gera (ou refaz) o resumo de uma sessão já gravada.</summary>
