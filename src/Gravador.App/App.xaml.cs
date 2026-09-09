@@ -69,9 +69,12 @@ public partial class App : Application
         if (render >= 0)
         {
             var destino = render + 1 < e.Args.Length ? e.Args[render + 1] : ".";
-            var codigo = e.Args.Contains("--gravando")
-                ? Smoke.RenderizarGravando(destino)
-                : Smoke.Renderizar(destino);
+            var sessaoArg = Array.IndexOf(e.Args, "--sessao");
+            var codigo = sessaoArg >= 0 && sessaoArg + 1 < e.Args.Length
+                ? Smoke.RenderizarSessao(e.Args[sessaoArg + 1], destino)
+                : e.Args.Contains("--gravando")
+                    ? Smoke.RenderizarGravando(destino)
+                    : Smoke.Renderizar(destino);
             _atalhos?.Dispose();
             _bandeja?.Dispose();
             Servico.Dispose();

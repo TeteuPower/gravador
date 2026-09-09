@@ -59,13 +59,13 @@ public sealed class Analista
 
     private const string SystemPromptMcp = """
         Você analisa o registro de uma reunião ou apresentação gravada pela ferramenta Gravador.
-        Você não tem o áudio nem a tela: tem ferramentas, e deve usá-las em vez de supor.
-        - linha_do_tempo: comece por aqui. Mostra duração, idioma, slides, trechos descartados, mudo.
-        - transcricao(de, ate, versao): a fala entre dois instantes. Percorra a sessão inteira em
-          intervalos (a resposta diz onde parou); não tente pegar tudo de uma vez.
-        - buscar(texto): acha onde um assunto foi falado.
-        - quadros / ver_quadro(id): os slides. Veja os que forem relevantes para o resumo.
+        A transcrição inteira vem no pedido, então você já tem o conteúdo falado — não a peça de novo
+        em pedaços. Use as ferramentas só para o que falta:
+        - quadros / ver_quadro(id): olhe os slides que forem relevantes para entender ou ilustrar um
+          ponto (números, diagramas, títulos que a fala não deixa claros).
+        - linha_do_tempo: se precisar conferir os trechos descartados ou os momentos de microfone mudo.
         - definir_capitulo(em, titulo): ao terminar, nomeie os capítulos principais da sessão.
+        Não chame a ferramenta transcricao — você já tem a transcrição no pedido.
         Responda só com o resumo pedido, em Markdown, sem preâmbulo.
         """;
 
@@ -78,10 +78,10 @@ public sealed class Analista
             return new RespostaDoClaude(false, "", conta.Descricao, null, TimeSpan.Zero);
 
         etapa?.Report("Montando o pedido...");
-        var mcp = conta.Meio == MeioDeAcesso.ChaveDeApi ? null : ClaudeCli.McpConfigJson(sessao.Pasta);
+        var mcp = conta.Meio != MeioDeAcesso.ChaveDeApi && ClaudeCli.McpDisponivel;
 
         RespostaDoClaude resposta;
-        if (conta.Meio == MeioDeAcesso.ChaveDeApi || mcp == null)
+        if (!mcp)
         {
             // Sem o Claude Code (ou sem o gravador-cli ao lado): tudo vai dentro do prompt.
             var prompt = MontarPromptCompleto(sessao, config);
@@ -102,16 +102,19 @@ public sealed class Analista
             {
                 Modelo = config.ModeloClaude,
                 SystemPrompt = SystemPromptMcp,
-                McpConfigJson = mcp,
+                PastaDaSessaoMcp = sessao.Pasta,
                 PastaDeTrabalho = sessao.Pasta,
                 TokenOAuth = PosProcessamento.TokenDe(conta),
                 PersistirSessao = false,
                 AoChamarFerramenta = f => etapa?.Report($"Claude lendo: {f.Replace("mcp__gravador__", "")}"),
             };
-            foreach (var f in ClaudeCli.FerramentasMcpPermitidas(FerramentasDaSessao.Para(sessao).Select(t => t.Nome)))
+            // Só as ferramentas que o resumo de fato usa: ver os slides e nomear capítulos. A
+            // transcrição vai no pedido, então nada de transcricao/buscar aqui — era o que fazia o
+            // Claude percorrer 48 minutos em dezenas de chamadas.
+            foreach (var f in ClaudeCli.FerramentasMcpPermitidas(["quadros", "ver_quadro", "linha_do_tempo", "definir_capitulo"]))
                 opcoes.FerramentasPermitidas.Add(f);
 
-            resposta = await ClaudeCli.PerguntarAsync(MontarPedidoCurto(sessao, config), opcoes, etapa, ct).ConfigureAwait(false);
+            resposta = await ClaudeCli.PerguntarAsync(MontarPromptCompleto(sessao, config), opcoes, etapa, ct).ConfigureAwait(false);
         }
 
         if (resposta.Ok)

@@ -306,16 +306,155 @@ Duas coisas ficaram sem prova nesta máquina, e vale dizer quais:
   estado foram exercitados pelo caminho manual, que passa exatamente pelo mesmo ponto. O que falta é
   o teste com o Teams aberto de verdade, apertando `Ctrl+Shift+M`.
 
+## Importar é criar uma sessão
+
+Um MP4 (ou MP3, M4A, WAV) que já existe entra pelo mesmo lugar que uma gravação ao vivo termina.
+`ImportadorDeMidia` cria a `SessaoGravacao`, extrai o áudio, amostra o vídeo e reduz os quadros a
+slides — e daí em diante chama exatamente o `PosProcessamento` que o `PararAsync` chama:
+transcrever, traduzir, resumir. Não há um segundo pipeline. Se a cauda morasse no fim do
+`PararAsync`, a importação precisaria de uma cópia, e as duas divergiriam no primeiro ajuste.
+
+Uma exceção consciente ao "pasta auto-suficiente": o vídeo original NÃO é copiado para dentro. Ele
+pesa centenas de megabytes e o valor dele já foi extraído; fica o caminho, o tamanho e a data. A
+pasta continua auto-suficiente *para a IA*, que é o que importa.
+
+### O áudio sai pelo Windows; o vídeo, pelo ffmpeg
+
+O `MediaFoundationReader` abre MP4/AAC e decodifica a **212× tempo real**: os 48 minutos de uma
+apresentação saem em 14 segundos, sem baixar nada. Para o vídeo não existe equivalente no Windows —
+o `GetThumbnailsAsync` do WinRT custou **2,7 s por quadro** (131 minutos para 1 fps) e devolveu os
+seis quadros pedidos byte a byte idênticos. Escrever o `IMFSourceReader` à mão seriam centenas de
+linhas de COM para um resultado pior.
+
+Então o ffmpeg entra — **baixado sob demanda, só na primeira importação** (a build "essentials" do
+gyan.dev, 111 MB; só `ffmpeg.exe` e `ffprobe.exe` são extraídos). Quem só grava reunião nunca baixa
+um byte. É a revisão consciente da decisão "sem ffmpeg" do início: ela valia para *codificar áudio*,
+onde o Windows já tem codificador; não vale para *decodificar vídeo*, onde não tem nada. Amostrar 48
+minutos de 2560×1600 a 60 fps para 2913 miniaturas de 640 px levou **3m50s**.
+
+## O funil de quadros
+
+`Importacao/AnaliseDeQuadros.cs`. A pergunta "quais destes 2913 quadros são slides, e onde na tela
+está cada slide?" é respondida sem modelo nenhum, em aritmética sobre miniaturas de 160×100 em
+cinza — a análise inteira leva **10 segundos**. A IA recebe os slides, não a tarefa de achá-los; é
+o princípio "código, não token" aplicado onde ele mais rende (2913 imagens em tokens de visão seria
+o absurdo que este passo evita).
+
+A ideia que organiza tudo: cada região da tela tem uma **assinatura temporal**, e é ela que diz o
+que a região é — não o conteúdo. A moldura do navegador e o desktop nunca mudam. O slide muda raro,
+de golpe, e fica parado dezenas de segundos. O vídeo do palestrante e as legendas mudam sempre. E
+"você navegando por cima" muda tudo ao mesmo tempo, inclusive o que nunca muda.
+
+Foi calibrado num webinar real de 48 min (ON24: slide + palestrante + legendas queimadas, layout
+variável) com cinco minutos de outras janelas por cima. Três lições, cada uma um defeito que
+apareceu numa iteração e está registrada no código:
+
+**1. A moldura se define pela fração de quadros iguais à mediana, não pelo desvio médio.** A
+primeira versão usava o desvio absoluto médio para achar "o que nunca muda". Os 8% de quadros com o
+IDE por cima inflavam o desvio *justamente dos pixels que os denunciariam* — a barra de abas do
+Chrome vira barra escura do IDE —, e esses pixels saíam da moldura. Resultado: o IDE passava como
+pertinente e o retângulo de slide vinha com a largura inteira da tela. Pela fração ("igual à
+mediana em 85% dos quadros") os pixels ficam, e o IDE cai.
+
+**2. Só a moldura *estruturada* vota na pertinência.** Uma busca no Google na mesma janela do Chrome
+tem a moldura do navegador idêntica; o que some é o cabeçalho da apresentação, um pedaço pequeno. O
+desktop preto — moldura também — diluía a fração: preto sobre preto não diz nada. Só os pixels de
+moldura com mediana acima de 24 votam, e uma tela apagada (média abaixo de 12) é descartada direto.
+
+**3. O slide não tem lugar fixo.** O layout do ON24 trocava o slide de lado e de tamanho com o do
+palestrante, e enquetes apareciam por cima da webcam. Um retângulo único para o vídeo inteiro
+achava a região das enquetes — que muda de golpe, como um slide. O que funciona é o retângulo **por
+troca**: no instante em que muitos pixels do conteúdo viram de uma vez, a caixa do que virou é o
+slide, onde ele estiver naquele momento. Cada trecho carrega o seu recorte; caixa menor que 6% da
+tela é enquete ou notificação e não abre trecho.
+
+Dentro do recorte, "parado" se mede pela **fração de linhas que mudou**, não pela diferença média:
+a legenda queimada muda três linhas, o cursor uma, a troca de slide muda a maioria. A média não
+distingue "legenda grande" de "slide pequeno"; a fração distingue.
+
+O resultado no vídeo de calibração: **2913 quadros → 59 recortes**, que são o deck ("What Breaks
+When We Scale", "Full-Stack Enterprise AI Factory", "Sandboxed Compute", "Agent Harness
+Landscape", as enquetes); **5 minutos descartados** como não pertinentes (tela preta, Google,
+Slack, Outlook). O que fica imperfeito, declarado: alguns recortes incluem a palestrante ao lado do
+slide (a troca mudou os dois painéis), e um ou dois quadros de outra janela ainda escapam. O Claude
+corrige pela ferramenta `marcar_trecho`; é para isso que ela existe.
+
+## O Claude lê pelas ferramentas nossas
+
+`Claude/Mcp/`. A chamada ao `claude` mudou de forma. Antes, o prompt levava a transcrição inteira
+e o Claude Code entrava com o system prompt e as ferramentas dele. Agora:
+
+- `--tools ""` desliga as ferramentas nativas — a lista delas sozinha são milhares de tokens de
+  descrição em toda mensagem;
+- `--system-prompt` substitui o prompt padrão pelo nosso, de dez linhas;
+- `--setting-sources ""` não carrega CLAUDE.md, hooks nem servidores MCP do usuário;
+- `--strict-mcp-config --mcp-config` liga **só** o servidor do Gravador.
+
+O servidor é o próprio `gravador-cli mcp --sessao <pasta>`: JSON-RPC 2.0 por stdio, quatro métodos
+(`initialize`, `tools/list`, `tools/call`, `ping`), dez ferramentas. Três **recriam** as de leitura
+do Claude Code (`Read`, `Glob`, `Grep`) com a mesma forma de saída, trancadas na pasta da sessão —
+um `Read` de `../../Windows/win.ini` é recusado. As outras são o que a tarefa precisa e o Claude
+Code não tem: `transcricao(de, ate)` por intervalo, `buscar`, `quadros`/`ver_quadro` (imagem
+redimensionada a 1280 px — um slide a 2560 custa quatro vezes mais tokens de visão e não se lê
+melhor), e duas escritas controladas, `definir_capitulo` e `marcar_trecho`. Nem Bash, nem escrita
+de arquivo, nem nada fora da pasta.
+
+O que isso custa, medido:
+
+| chamada | tokens de entrada novos | prefixo em cache | saída |
+|---|---:|---:|---:|
+| pergunta simples, sem ferramenta nativa | **148** | 6 298 (system prompt + 10 esquemas) | 114 |
+| a mesma pergunta pelo Claude Code padrão | ~15 000–20 000 | — | — |
+
+Numa apresentação de 48 minutos, a transcrição tem 40 mil caracteres. Ela nunca vai inteira: o
+Claude pede o minuto que a pergunta precisa. A pergunta custa o que a pergunta vale.
+
+### O servidor sobe sem que o `claude -p` espere por ele
+
+O primeiro teste devolveu "não tenho essa ferramenta" com `mcp_servers: pending` no evento `init`.
+O log de depuração do Claude Code explicou: `--mcp-config servers running fully async (nonblocking)`
+— nesta versão o `-p` sobe os servidores e **não espera** a conexão antes da primeira mensagem; o
+nosso conectou em 1,5 s, o modelo já tinha respondido.
+
+A solução é determinística e fica dos dois lados: o servidor grava um **marcador de pronto** depois
+de servir `tools/list` (ele é o único que sabe quando o aperto de mão terminou), e o `ClaudeCli`
+chama o `claude` com `--input-format stream-json`, espera o marcador aparecer (até 25 s) e só então
+manda a pergunta como mensagem. Um atraso fixo teria funcionado nesta máquina e falhado numa
+modesta e ocupada, que é onde esta ferramenta vai rodar.
+
+## Whisper local
+
+`Transcription/WhisperTranscritor.cs`. O whisper.cpp entra como quarto motor, baixado sob demanda
+(8 MB de binário para CPU genérica + 148 MB do modelo `base`; `small` e `medium` são opção). Ele
+roda no fim, sobre o arquivo — nunca ao vivo — porque em máquina modesta disputaria a CPU com a
+reunião. Medido: **48 min transcritos em 6m45s** com o modelo base e 12 threads, 876 trechos, 6,9 mil
+palavras em inglês. O áudio vai a 16 kHz mono, o formato interno do modelo.
+
+A build com CUDA seria 10× mais rápida em quem tem placa NVIDIA, mas custa 270 a 670 MB e não roda
+em quem não tem. Transcrição é pós-processamento: esperar alguns minutos é aceitável; não rodar,
+não.
+
+## Tradução preserva os carimbos
+
+`Claude/Tradutor.cs`. O endpoint de tradução do Whisper só traduz *para* o inglês — não serve para
+quem quer a apresentação em português. Quem traduz é o Claude, em pedaços de ~6 mil caracteres, com
+cada linha carimbada (`` `12:34` texto ``) e a instrução de devolver as mesmas linhas com os mesmos
+carimbos. É o que mantém a tradução alinhada ao áudio. O original nunca é sobrescrito: a tradução é
+`traducao.md`, arquivo próprio. Cada pedaço é a chamada mais barata da ferramenta — sem ferramenta
+nenhuma, sem system prompt do Claude Code.
+
 ## O que ficou de fora, e por quê
 
 **Gravar vídeo.** O propósito é virar texto para uma IA; vídeo multiplica o tamanho por dez sem
 acrescentar nada que a captura de tela sob demanda não dê. As capturas cobrem o slide e a planilha,
 que é o que se quer rever.
 
-**Transcrição local por whisper.cpp.** Seria a melhor qualidade offline, e foi recusada pelo mesmo
-requisito que recusou o Electron: em máquina modesta, transcrever em tempo real disputa a CPU com a
-reunião que está sendo gravada. Fica declarado como o próximo motor a entrar, atrás da interface
-`ITranscritorDeArquivo`, que já existe justamente para isso.
+**Transcrição ao vivo por whisper.cpp.** O whisper entrou, mas só no pós-processamento. Ao vivo,
+em máquina modesta, ele disputaria a CPU com a reunião que está sendo gravada — e o requisito desta
+ferramenta é não atrapalhar a reunião.
+
+**Um retângulo de slide para o vídeo inteiro.** Era o desenho inicial do funil e foi recusado pelo
+próprio vídeo de calibração: o layout muda. O recorte é por trecho.
 
 **Separar quem falou (diarização).** As trilhas separadas já resolvem o caso que importa — você
 contra os outros. Separar os outros entre si exige modelo próprio e erra bastante com áudio de

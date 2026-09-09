@@ -249,12 +249,15 @@ internal static partial class Program
     /// </summary>
     private static async Task<int> Mcp(string[] argv)
     {
-        string? pasta = null;
+        string? pasta = null, pronto = null;
         for (var i = 0; i < argv.Length; i++)
+        {
             if (argv[i].Equals("--sessao", StringComparison.OrdinalIgnoreCase) && i + 1 < argv.Length) pasta = argv[++i];
+            else if (argv[i].Equals("--pronto", StringComparison.OrdinalIgnoreCase) && i + 1 < argv.Length) pronto = argv[++i];
+        }
         if (pasta == null)
         {
-            Console.Error.WriteLine("Uso: gravador-cli mcp --sessao <pasta>");
+            Console.Error.WriteLine("Uso: gravador-cli mcp --sessao <pasta> [--pronto <arquivo>]");
             return 2;
         }
 
@@ -267,7 +270,7 @@ internal static partial class Program
 
         var servidor = new Gravador.Core.Claude.Mcp.ServidorMcp("gravador",
             Gravador.Core.Claude.Mcp.FerramentasDaSessao.Instrucoes(sessao),
-            Gravador.Core.Claude.Mcp.FerramentasDaSessao.Para(sessao));
+            Gravador.Core.Claude.Mcp.FerramentasDaSessao.Para(sessao), pronto);
         return await servidor.RodarAsync().ConfigureAwait(false);
     }
 

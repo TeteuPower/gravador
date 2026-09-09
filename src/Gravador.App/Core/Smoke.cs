@@ -139,6 +139,35 @@ internal static class Smoke
         codificador.Save(fs);
     }
 
+    /// <summary>
+    /// Desenha a janela de detalhe de uma sessão — slides, linha do tempo, textos, o painel da
+    /// conversa. Recebe a pasta de uma sessão já pronta.
+    /// </summary>
+    public static int RenderizarSessao(string pastaDaSessao, string destino)
+    {
+        var sessao = Gravador.Core.Session.SessaoGravacao.Abrir(pastaDaSessao);
+        if (sessao == null) { Console.Error.WriteLine("Não achei uma sessão em " + pastaDaSessao); return 2; }
+        Directory.CreateDirectory(destino);
+
+        var janela = new JanelaSessao(sessao)
+        {
+            Width = 1240,
+            Height = 800,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -32000,
+            Top = -32000,
+            ShowInTaskbar = false,
+        };
+        janela.Show();
+        Bombear();
+        janela.UpdateLayout();
+        Bombear();
+        Gravar(janela, Path.Combine(destino, "sessao.png"));
+        Console.WriteLine("sessao.png em " + destino);
+        janela.Close();
+        return 0;
+    }
+
     /// <summary>Deixa o WPF processar o que está na fila (layout, binding, disparos de eventos).</summary>
     private static void Bombear()
     {

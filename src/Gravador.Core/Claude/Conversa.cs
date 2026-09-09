@@ -70,8 +70,7 @@ public sealed class Conversa
         if (conta.Meio == MeioDeAcesso.ChaveDeApi)
             return new RespostaDoClaude(false, "", "A conversa precisa do Claude Code instalado (ela usa as ferramentas do Gravador por MCP).", null, TimeSpan.Zero);
 
-        var mcp = ClaudeCli.McpConfigJson(_sessao.Pasta);
-        if (mcp == null) return new RespostaDoClaude(false, "", "Não achei o gravador-cli.exe ao lado do aplicativo.", null, TimeSpan.Zero);
+        if (!ClaudeCli.McpDisponivel) return new RespostaDoClaude(false, "", "Não achei o gravador-cli.exe ao lado do aplicativo.", null, TimeSpan.Zero);
 
         Ocupada = true;
         try
@@ -80,7 +79,7 @@ public sealed class Conversa
             {
                 Modelo = _config.ModeloClaude,
                 SystemPrompt = SystemPrompt,
-                McpConfigJson = mcp,
+                PastaDaSessaoMcp = _sessao.Pasta,
                 PastaDeTrabalho = _sessao.Pasta,
                 TokenOAuth = PosProcessamento.TokenDe(conta),
                 PersistirSessao = true,

@@ -37,8 +37,12 @@ public sealed class OpcoesDoClaude
     /// <summary>Ligar as ferramentas embutidas do Claude Code (Read, Bash...). Padrão: desligadas.</summary>
     public bool FerramentasNativas { get; set; }
 
-    /// <summary>JSON de <c>mcpServers</c> a carregar em modo estrito — só ele, nada do usuário.</summary>
-    public string? McpConfigJson { get; set; }
+    /// <summary>
+    /// Pasta da sessão cujo servidor MCP deve ser ligado (em modo estrito — só ele, nada do usuário).
+    /// O <see cref="ClaudeCli"/> monta a configuração, espera o servidor conectar e só então manda a
+    /// pergunta.
+    /// </summary>
+    public string? PastaDaSessaoMcp { get; set; }
 
     /// <summary>Ferramentas pré-aprovadas (ex.: "mcp__gravador__*"). Sem isto, o `-p` nega tudo.</summary>
     public List<string> FerramentasPermitidas { get; } = new();
@@ -79,35 +83,61 @@ public static class ClaudeCli
     private static bool _procurou;
 
     /// <summary>
-    /// Acha o executável do `claude`. Cobre a instalação por npm (um .cmd em %APPDATA%\npm) e a
-    /// nativa (um .exe em %LOCALAPPDATA%), que são os dois jeitos oficiais no Windows.
+    /// Acha o executável do `claude`.
+    ///
+    /// O que importa aqui, e custou um bom tempo para descobrir: precisa ser um .EXE, nunca o .cmd
+    /// do npm. O `claude.cmd` é um batch que repassa os argumentos com <c>%*</c>, e o <c>%*</c>
+    /// ENGOLE argumentos vazios — os nossos <c>--setting-sources ""</c> e <c>--tools ""</c> somem, e
+    /// o parser do Claude lê o flag seguinte como valor do anterior ("Invalid setting source:
+    /// --tools"). O servidor MCP nunca conecta e o modelo responde sem ferramenta nenhuma. O .exe
+    /// recebe os argumentos direto, sem batch no meio, e os vazios chegam intactos.
+    ///
+    /// Por isso o .exe nativo que fica ao lado do .cmd (em <c>node_modules\...\bin\claude.exe</c>)
+    /// vem ANTES do .cmd na busca. Cobre a instalação por npm e a nativa.
     /// </summary>
     public static string? Localizar()
     {
         if (_procurou) return _cache;
         _procurou = true;
 
-        var candidatos = new List<string>();
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var perfil = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-        candidatos.Add(Path.Combine(appData, "npm", "claude.cmd"));
-        candidatos.Add(Path.Combine(localAppData, "Programs", "claude", "claude.exe"));
-        candidatos.Add(Path.Combine(perfil, ".local", "bin", "claude.exe"));
-
+        var candidatos = new List<string>
+        {
+            // o .exe real por trás do claude.cmd do npm global
+            Path.Combine(appData, "npm", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+            Path.Combine(localAppData, "Programs", "claude", "claude.exe"),
+            Path.Combine(perfil, ".local", "bin", "claude.exe"),
+        };
         foreach (var pasta in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
         {
             if (string.IsNullOrWhiteSpace(pasta)) continue;
             candidatos.Add(Path.Combine(pasta.Trim(), "claude.exe"));
-            candidatos.Add(Path.Combine(pasta.Trim(), "claude.cmd"));
+            candidatos.Add(ExeAoLadoDoCmd(Path.Combine(pasta.Trim(), "claude.cmd")));
         }
+        candidatos.Add(ExeAoLadoDoCmd(Path.Combine(appData, "npm", "claude.cmd")));
 
         _cache = candidatos.FirstOrDefault(c =>
         {
-            try { return File.Exists(c); } catch { return false; }
+            try { return !string.IsNullOrEmpty(c) && File.Exists(c); } catch { return false; }
         });
         return _cache;
+    }
+
+    /// <summary>O <c>bin\claude.exe</c> que um <c>claude.cmd</c> do npm chama, se ele existir.</summary>
+    private static string ExeAoLadoDoCmd(string cmd)
+    {
+        try
+        {
+            var exe = Path.Combine(Path.GetDirectoryName(cmd)!, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe");
+            return File.Exists(exe) ? exe : cmd;
+        }
+        catch
+        {
+            return cmd;
+        }
     }
 
     /// <summary>Esquece o caminho achado — usado quando o usuário acabou de instalar o Claude Code.</summary>
@@ -137,19 +167,31 @@ public static class ClaudeCli
     }
 
     /// <summary>O JSON de <c>--mcp-config</c> que aponta o `claude` para o servidor MCP desta sessão.</summary>
-    public static string? McpConfigJson(string pastaDaSessao)
+    public static string? McpConfigJson(string pastaDaSessao, out string? marcador)
     {
+        marcador = null;
         var cli = LocalizarGravadorCli();
         if (cli == null) return null;
+        var pastaTemp = Path.Combine(Path.GetTempPath(), "Gravador");
+        Directory.CreateDirectory(pastaTemp);
+        var id = Guid.NewGuid().ToString("N");
+        marcador = Path.Combine(pastaTemp, "mcp-" + id + ".pronto");
         var config = new
         {
             mcpServers = new
             {
-                gravador = new { command = cli, args = new[] { "mcp", "--sessao", Path.GetFullPath(pastaDaSessao) } },
+                gravador = new { command = cli, args = new[] { "mcp", "--sessao", Path.GetFullPath(pastaDaSessao), "--pronto", marcador } },
             },
         };
-        return JsonSerializer.Serialize(config);
+        // Em ARQUIVO, e nao como string inline: medido, o `claude` conecta o servidor mais cedo lendo
+        // de arquivo (a string inline ainda estava "pending" com 3 s de folga; o arquivo, conectado).
+        var arquivo = Path.Combine(pastaTemp, "mcp-" + id + ".json");
+        File.WriteAllText(arquivo, JsonSerializer.Serialize(config));
+        return arquivo;
     }
+
+    /// <summary>Há como ligar o servidor MCP desta máquina? (o gravador-cli precisa estar ao lado do app)</summary>
+    public static bool McpDisponivel => LocalizarGravadorCli() != null;
 
     /// <summary>Nomes das ferramentas do servidor "gravador" no formato que o `--allowedTools` espera.</summary>
     public static IEnumerable<string> FerramentasMcpPermitidas(IEnumerable<string> nomes) =>
@@ -191,10 +233,17 @@ public static class ClaudeCli
         if (!opcoes.FerramentasNativas) { a.Add("--tools"); a.Add(""); }
         if (opcoes.SystemPrompt is { } sp) { a.Add("--system-prompt"); a.Add(sp); }
 
-        if (opcoes.McpConfigJson is { } mcp)
+        string? marcador = null;
+        if (opcoes.PastaDaSessaoMcp is { } pastaMcp)
         {
+            var mcp = McpConfigJson(pastaMcp, out marcador);
+            if (mcp == null)
+                return new RespostaDoClaude(false, "", "Não achei o gravador-cli.exe ao lado do aplicativo — é ele que serve as ferramentas ao Claude.", null, TimeSpan.Zero);
             a.Add("--strict-mcp-config");
             a.Add("--mcp-config"); a.Add(mcp);
+            // A pergunta entra por mensagem, não pelo fim do stdin: assim dá para esperar o servidor
+            // MCP conectar antes de mandá-la. Ver EsperarMcpAsync.
+            a.Add("--input-format"); a.Add("stream-json");
         }
         if (opcoes.FerramentasPermitidas.Count > 0)
         {
@@ -215,6 +264,9 @@ public static class ClaudeCli
         // Sem verificação de atualização nem telemetria numa chamada de serviço.
         info.Environment["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1";
 
+        if (Environment.GetEnvironmentVariable("GRAVADOR_CLAUDE_DEBUG") == "1")
+            Console.Error.WriteLine("[claude] " + exe + " " + string.Join(" ", a.Select(x => x.Length == 0 ? "\"\"" : x.Contains(' ') ? $"\"{x[..Math.Min(40, x.Length)]}…\"" : x)));
+
         try
         {
             using var processo = new Process { StartInfo = info };
@@ -225,8 +277,51 @@ public static class ClaudeCli
 
             var erro = processo.StandardError.ReadToEndAsync(ct);
 
-            await processo.StandardInput.WriteAsync(prompt.AsMemory(), ct).ConfigureAwait(false);
-            processo.StandardInput.Close();
+            // A escrita do stdin roda em PARALELO com a leitura do stdout, e isto não é um detalhe: no
+            // caminho MCP a escrita espera segundos pelo servidor conectar, e durante essa espera o
+            // `claude` já está escrevendo no stdout (evento de início, resposta ao control_request). Se
+            // ninguém drena o stdout, o buffer do pipe enche, o `claude` BLOQUEIA na escrita, e a
+            // conexão MCP degrada — o sintoma era o modelo "narrar" a chamada da ferramenta e parar no
+            // primeiro turno. O node do harness nunca teve isso porque o handler de 'data' drena desde
+            // o começo. Aqui a leitura começa logo abaixo; a escrita vai para uma tarefa.
+            var escrita = Task.Run(async () =>
+            {
+                try
+                {
+                    if (marcador != null)
+                    {
+                        // O `claude -p` desiste da entrada se nada chegar em 3 s; este control_request é
+                        // o que o Agent SDK manda primeiro — conta como entrada, não dispara o modelo, e
+                        // compra o tempo de esperar o servidor MCP conectar.
+                        var abertura = JsonSerializer.Serialize(new
+                        {
+                            type = "control_request",
+                            request_id = "gravador-init",
+                            request = new { subtype = "initialize" },
+                        });
+                        await processo.StandardInput.WriteAsync((abertura + "\n").AsMemory(), ct).ConfigureAwait(false);
+                        await processo.StandardInput.FlushAsync(ct).ConfigureAwait(false);
+
+                        await EsperarMcpAsync(marcador, processo, etapa, ct).ConfigureAwait(false);
+                        var mensagem = JsonSerializer.Serialize(new
+                        {
+                            type = "user",
+                            message = new { role = "user", content = new[] { new { type = "text", text = prompt } } },
+                        });
+                        await processo.StandardInput.WriteAsync((mensagem + "\n").AsMemory(), ct).ConfigureAwait(false);
+                        await processo.StandardInput.FlushAsync(ct).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await processo.StandardInput.WriteAsync(prompt.AsMemory(), ct).ConfigureAwait(false);
+                    }
+                    processo.StandardInput.Close();
+                }
+                catch (IOException)
+                {
+                    // o `claude` fechou a entrada antes da hora; o motivo aparece no result/stderr
+                }
+            }, ct);
 
             var acumulado = new StringBuilder();
             RespostaDoClaude? final = null;
@@ -245,7 +340,11 @@ public static class ClaudeCli
             }
 
             await processo.WaitForExitAsync(ct).ConfigureAwait(false);
+            try { await escrita.ConfigureAwait(false); } catch { /* a tarefa de escrita já tratou o que importa */ }
             var textoErro = await erro.ConfigureAwait(false);
+
+            if (Environment.GetEnvironmentVariable("GRAVADOR_CLAUDE_DEBUG") == "1" && textoErro.Length > 0)
+                Console.Error.WriteLine("[claude stderr]\n" + (textoErro.Length > 2000 ? textoErro[..2000] : textoErro));
 
             if (final != null) return final with { Duracao = inicio.Elapsed };
 
@@ -264,6 +363,41 @@ public static class ClaudeCli
         catch (Exception ex)
         {
             return new RespostaDoClaude(false, "", ex.Message, null, inicio.Elapsed);
+        }
+        finally
+        {
+            if (marcador != null)
+            {
+                try { File.Delete(marcador); } catch { /* temp */ }
+                try { File.Delete(Path.ChangeExtension(marcador, ".json")); } catch { /* temp */ }
+            }
+        }
+    }
+
+    /// <summary>Quanto esperar o servidor MCP subir antes de perguntar assim mesmo. Numa máquina modesta e ocupada, o .NET leva segundos.</summary>
+    private static readonly TimeSpan EsperaMaximaPeloMcp = TimeSpan.FromSeconds(25);
+
+    /// <summary>
+    /// Espera o marcador que o servidor MCP grava depois de servir <c>tools/list</c>.
+    ///
+    /// Sem isto a pergunta chega antes da conexão e o modelo responde "não tenho essa ferramenta":
+    /// o `claude -p` sobe os servidores de <c>--mcp-config</c> sem esperar por eles. Se o marcador
+    /// não aparecer no tempo máximo, a pergunta vai mesmo assim — pior responder sem ferramenta do
+    /// que não responder.
+    /// </summary>
+    private static async Task EsperarMcpAsync(string marcador, Process processo, IProgress<string>? etapa, CancellationToken ct)
+    {
+        var limite = DateTime.UtcNow + EsperaMaximaPeloMcp;
+        var avisou = false;
+        while (DateTime.UtcNow < limite && !processo.HasExited)
+        {
+            if (File.Exists(marcador)) return;
+            if (!avisou && DateTime.UtcNow > limite - EsperaMaximaPeloMcp + TimeSpan.FromSeconds(3))
+            {
+                avisou = true;
+                etapa?.Report("Ligando as ferramentas do Gravador no Claude...");
+            }
+            await Task.Delay(100, ct).ConfigureAwait(false);
         }
     }
 

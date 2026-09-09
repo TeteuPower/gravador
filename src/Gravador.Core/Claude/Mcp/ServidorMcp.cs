@@ -56,14 +56,24 @@ public sealed class ServidorMcp
     private readonly IReadOnlyList<FerramentaMcp> _ferramentas;
     private readonly string _nome;
     private readonly string _instrucoes;
+    private readonly string? _marcadorDePronto;
     private readonly object _travaDeEscrita = new();
     private StreamWriter _saida = null!;
 
-    public ServidorMcp(string nome, string instrucoes, IReadOnlyList<FerramentaMcp> ferramentas)
+    /// <param name="marcadorDePronto">
+    /// Arquivo a criar quando o cliente já pediu a lista de ferramentas — o sinal de "pode perguntar".
+    ///
+    /// Existe porque o `claude -p` sobe os servidores de <c>--mcp-config</c> sem esperar por eles
+    /// ("running fully async (nonblocking)", diz o log dele): se a pergunta entrar antes da conexão,
+    /// o modelo responde sem ferramenta nenhuma. Quem nos chama espera este arquivo aparecer antes de
+    /// mandar a pergunta. O servidor é o único que sabe quando o aperto de mão terminou.
+    /// </param>
+    public ServidorMcp(string nome, string instrucoes, IReadOnlyList<FerramentaMcp> ferramentas, string? marcadorDePronto = null)
     {
         _nome = nome;
         _instrucoes = instrucoes;
         _ferramentas = ferramentas;
+        _marcadorDePronto = marcadorDePronto;
     }
 
     public async Task<int> RodarAsync(CancellationToken ct = default)
@@ -142,6 +152,7 @@ public sealed class ServidorMcp
                         ["description"] = f.Descricao,
                         ["inputSchema"] = f.Esquema.DeepClone(),
                     });
+                SinalizarPronto();
                 return new JsonObject { ["tools"] = lista };
             }
 
@@ -192,6 +203,20 @@ public sealed class ServidorMcp
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         });
         lock (_travaDeEscrita) _saida.WriteLine(json);
+    }
+
+    private void SinalizarPronto()
+    {
+        if (_marcadorDePronto == null) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_marcadorDePronto)!);
+            File.WriteAllText(_marcadorDePronto, DateTimeOffset.UtcNow.ToString("o"));
+        }
+        catch
+        {
+            // sem marcador, quem chama cai no tempo máximo de espera
+        }
     }
 
     private static void Log(string texto)

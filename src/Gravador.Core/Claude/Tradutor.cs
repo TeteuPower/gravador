@@ -140,7 +140,8 @@ public static class Tradutor
         var curto = Transcription.Transcritores.CodigoCurto(codigo);
         return curto switch
         {
-            "pt" => codigo.Contains("PT", StringComparison.OrdinalIgnoreCase) ? "português de Portugal" : "português do Brasil",
+            // pelo sufixo da região: "pt-BR" contém "pt" e já quase virou português de Portugal por isso
+            "pt" => codigo.EndsWith("-PT", StringComparison.OrdinalIgnoreCase) ? "português de Portugal" : "português do Brasil",
             "en" => "inglês",
             "es" => "espanhol",
             "fr" => "francês",
