@@ -49,6 +49,33 @@ public partial class App : Application
 
         AppInfo.GarantirPastas();
         Config = AppSettings.Carregar();
+
+        // Verificação da interface: desenha em PNG e sai. Ver Core/Smoke.cs.
+        //
+        // Vem ANTES de montar o serviço, a bandeja e os atalhos de propósito: renderizar uma sessão
+        // (que já existe em disco) não precisa do motor de áudio nem do vigia de mudo, e a thread
+        // desse vigia é o que fazia o modo --render travar sem sair. Só o modo --render --gravando
+        // precisa do serviço, e ele o cria por conta própria.
+        var render = Array.IndexOf(e.Args, "--render");
+        if (render >= 0)
+        {
+            var destino = render + 1 < e.Args.Length ? e.Args[render + 1] : ".";
+            var sessaoArg = Array.IndexOf(e.Args, "--sessao");
+            int codigo;
+            if (sessaoArg >= 0 && sessaoArg + 1 < e.Args.Length)
+                codigo = Smoke.RenderizarSessao(e.Args[sessaoArg + 1], destino);
+            else if (e.Args.Contains("--gravando"))
+            {
+                Servico = new ServicoDeGravacao(Config);
+                codigo = Smoke.RenderizarGravando(destino);
+                Servico.Dispose();
+            }
+            else
+                codigo = Smoke.Renderizar(destino);
+            Shutdown(codigo);
+            return;
+        }
+
         Servico = new ServicoDeGravacao(Config);
 
         _bandeja = new TrayIcon(Servico);
@@ -61,27 +88,8 @@ public partial class App : Application
         // A janela só é construída quando alguém vai vê-la.
         //
         // Abrir na bandeja é o modo de quem deixa o Gravador ligado o dia inteiro, e nesse caso a
-        // janela nunca aparece: construí-la assim mesmo carregaria a árvore visual e as quatro
-        // páginas para nada. O motor de gravação e a bandeja não dependem dela — é o que faz o
-        // modo bandeja custar uma fração do modo com janela.
-        // Verificação da interface: desenha as abas em PNG e sai. Ver Core/Smoke.cs.
-        var render = Array.IndexOf(e.Args, "--render");
-        if (render >= 0)
-        {
-            var destino = render + 1 < e.Args.Length ? e.Args[render + 1] : ".";
-            var sessaoArg = Array.IndexOf(e.Args, "--sessao");
-            var codigo = sessaoArg >= 0 && sessaoArg + 1 < e.Args.Length
-                ? Smoke.RenderizarSessao(e.Args[sessaoArg + 1], destino)
-                : e.Args.Contains("--gravando")
-                    ? Smoke.RenderizarGravando(destino)
-                    : Smoke.Renderizar(destino);
-            _atalhos?.Dispose();
-            _bandeja?.Dispose();
-            Servico.Dispose();
-            Shutdown(codigo);
-            return;
-        }
-
+        // janela nunca aparece: construí-la assim mesmo carregaria a árvore visual e as páginas
+        // para nada. O motor de gravação e a bandeja não dependem dela.
         var naBandeja = Config.ComecarMinimizado || e.Args.Contains("--minimizado");
         if (!naBandeja) MostrarJanela();
 

@@ -50,7 +50,7 @@
                                         <StackPanel>
                                             <Image Source="{Binding Imagem}" Stretch="Uniform" MaxHeight="150" Margin="4,4,4,2"/>
                                             <TextBlock Margin="8,2,8,6" FontSize="11" Foreground="{StaticResource TextoFraco}">
-                                                <Run Text="{Binding Carimbo}" FontFamily="Consolas"/> <Run Text="{Binding Rotulo}"/>
+                                                <Run Text="{Binding Carimbo, Mode=OneWay}" FontFamily="Consolas"/> <Run Text="{Binding Rotulo, Mode=OneWay}"/>
                                             </TextBlock>
                                         </StackPanel>
                                     </Border>

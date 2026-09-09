@@ -168,13 +168,27 @@ internal static class Smoke
         return 0;
     }
 
-    /// <summary>Deixa o WPF processar o que está na fila (layout, binding, disparos de eventos).</summary>
-    private static void Bombear()
+    /// <summary>
+    /// Deixa o WPF processar o que está na fila (layout, binding, disparos de eventos).
+    ///
+    /// Para no <c>ContextIdle</c> OU num teto de tempo, o que vier primeiro. O teto existe porque
+    /// uma tela pode nunca ficar ociosa: a janela de sessão decodifica dezenas de imagens de disco,
+    /// e o fluxo de I/O mantinha a fila sempre com algo pendente — o <c>PushFrame</c> não retornava
+    /// e o <c>--render</c> travava sem sair. Um teto de meio segundo é muito mais do que o layout
+    /// precisa e garante que a bomba sempre devolve.
+    /// </summary>
+    private static void Bombear(int tetoMs = 500)
     {
         var quadro = new System.Windows.Threading.DispatcherFrame();
+        void Parar() => quadro.Continue = false;
+
         System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
-            System.Windows.Threading.DispatcherPriority.ContextIdle,
-            new Action(() => quadro.Continue = false));
-        System.Windows.Threading.Dispatcher.PushFrame(quadro);
+            System.Windows.Threading.DispatcherPriority.ContextIdle, new Action(Parar));
+        var timer = new System.Windows.Threading.DispatcherTimer(
+            TimeSpan.FromMilliseconds(tetoMs), System.Windows.Threading.DispatcherPriority.Send,
+            (_, _) => Parar(), System.Windows.Threading.Dispatcher.CurrentDispatcher);
+        timer.Start();
+        try { System.Windows.Threading.Dispatcher.PushFrame(quadro); }
+        finally { timer.Stop(); }
     }
 }
