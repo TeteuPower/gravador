@@ -63,15 +63,17 @@ public partial class App : Application
             var sessaoArg = Array.IndexOf(e.Args, "--sessao");
             int codigo;
             if (sessaoArg >= 0 && sessaoArg + 1 < e.Args.Length)
-                codigo = Smoke.RenderizarSessao(e.Args[sessaoArg + 1], destino);
-            else if (e.Args.Contains("--gravando"))
             {
-                Servico = new ServicoDeGravacao(Config);
-                codigo = Smoke.RenderizarGravando(destino);
-                Servico.Dispose();
+                // desenhar uma sessão que já existe não precisa do motor de áudio
+                codigo = Smoke.RenderizarSessao(e.Args[sessaoArg + 1], destino);
             }
             else
-                codigo = Smoke.Renderizar(destino);
+            {
+                // as telas da janela principal usam App.Servico (a aba Gravar liga nos eventos dele)
+                Servico = new ServicoDeGravacao(Config);
+                codigo = e.Args.Contains("--gravando") ? Smoke.RenderizarGravando(destino) : Smoke.Renderizar(destino);
+                Servico.Dispose();
+            }
             Shutdown(codigo);
             return;
         }
