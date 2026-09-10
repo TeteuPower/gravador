@@ -41,10 +41,13 @@ jobs:
         shell: pwsh
         run: |
           $exe = "src\Gravador.App\bin\Release\net10.0-windows\Gravador.exe"
-          & $exe --render "$env:RUNNER_TEMP\telas"
-          if ($LASTEXITCODE -ne 0) { throw "o modo --render falhou" }
+          # Start-Process -Wait, e não `& $exe`: o PowerShell não espera aplicação de janela, ele
+          # dispara e segue. Com `&`, a conferência das imagens rodava antes de o app tê-las escrito.
+          $p = Start-Process -FilePath $exe -ArgumentList '--render', "$env:RUNNER_TEMP\telas" `
+                             -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "o modo --render falhou (código $($p.ExitCode))" }
           $png = Get-ChildItem "$env:RUNNER_TEMP\telas\*.png"
-          if ($png.Count -lt 4) { throw "esperava 4 imagens, saíram $($png.Count)" }
+          if ($png.Count -lt 5) { throw "esperava 5 imagens, saíram $($png.Count)" }
           $png | ForEach-Object { Write-Host "$($_.Name)  $([math]::Round($_.Length/1KB,1)) KB" }
 
       - name: Enviar as telas como artefato
@@ -67,6 +70,21 @@ jobs:
           dotnet publish src/Gravador.Cli -c Release -r win-x64 --self-contained -o publish
           if (-not (Test-Path publish/Gravador.exe)) { throw "Gravador.exe nao foi publicado" }
           if (-not (Test-Path publish/gravador-cli.exe)) { throw "gravador-cli.exe nao foi publicado" }
+
+      # A atualização automática compara a versão que o app relata (a do assembly) com a que está no
+      # nome do instalador anexado à release. Se as duas divergirem, o app ou nunca vê atualização
+      # ou se oferece para reinstalar a mesma versão em círculo — e nada disso dá erro em lugar
+      # nenhum. Divergir só é possível por engano de configuração, então é aqui que se descobre.
+      - name: Conferir que o executável e o instalador falam da mesma versão
+        shell: pwsh
+        run: |
+          $versao = '${{ steps.versao.outputs.versao }}'
+          $doExe = (Get-Item publish\Gravador.exe).VersionInfo.FileVersion
+          $tres = ($doExe -split '\.')[0..2] -join '.'
+          if ($tres -ne $versao) {
+            throw "VERSION diz $versao mas Gravador.exe relata $doExe; a atualizacao automatica nao funcionaria"
+          }
+          Write-Host "versao $versao conferida no executavel"
 
       # A imagem do runner não traz o Inno Setup; mesmo passo do claude-indicator.
       - name: Instalar o Inno Setup
@@ -103,6 +121,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           $setup = (Get-ChildItem Output\Gravador-Setup-*.exe | Select-Object -First 1).FullName
+          $atual = Split-Path $setup -Leaf
           $versao = '${{ steps.versao.outputs.versao }}'
           $titulo = "Build $versao (main)"
           $notas = "Instalador gerado automaticamente a partir do ultimo commit na main (versao $versao). Para versoes estaveis, use as releases numeradas."
@@ -120,6 +139,17 @@ jobs:
 
           $existe = Invoke-Gh @('release', 'view', 'latest', '--json', 'tagName') -Tentativas 2
 
+          # Quem já está instalado só recebe atualização se a versão SUBIR: o app compara números,
+          # não datas de commit. Um push na main sem mexer no arquivo VERSION publica um instalador
+          # que ninguém vai receber — o que é legítimo (nem todo commit merece atualizar a máquina
+          # de todo mundo), mas tem que ficar dito, senão vira "a atualização não está chegando".
+          if ($existe) {
+            $anexos = & gh release view latest --json assets --jq '.assets[].name'
+            if ($LASTEXITCODE -eq 0 -and ($anexos -contains $atual)) {
+              Write-Host "::notice::a release latest ja carrega $atual; suba o arquivo VERSION para que os instalados recebam a atualizacao"
+            }
+          }
+
           if (-not $existe) {
             Write-Host "criando a release latest"
             if (-not (Invoke-Gh @('release', 'create', 'latest', $setup, '--prerelease', '--title', $titulo, '--notes', $notas))) {
@@ -133,7 +163,6 @@ jobs:
           }
 
           # o nome do arquivo carrega a versao: sem limpar, a release acumula um .exe por build
-          $atual = Split-Path $setup -Leaf
           $nomes = & gh release view latest --json assets --jq '.assets[].name'
           if ($LASTEXITCODE -eq 0) {
             foreach ($nome in $nomes) {

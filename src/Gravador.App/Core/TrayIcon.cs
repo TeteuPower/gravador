@@ -22,6 +22,8 @@ public sealed class TrayIcon : IDisposable
     private readonly ServicoDeGravacao _servico;
     private readonly ToolStripMenuItem _itemGravar;
     private readonly ToolStripMenuItem _itemPausar;
+    private readonly ToolStripMenuItem _itemAtualizar;
+    private readonly ToolStripSeparator _separadorAtualizar;
     private readonly System.Windows.Forms.Timer _relogio;
     private Icon? _iconeParado;
     private Icon? _iconeGravando;
@@ -30,11 +32,26 @@ public sealed class TrayIcon : IDisposable
     public event Action? AbrirPedido;
     public event Action? SairPedido;
 
+    /// <summary>Alguém quer ver a atualização que foi anunciada (pelo balão ou pelo menu).</summary>
+    public event Action? AtualizarPedido;
+
     public TrayIcon(ServicoDeGravacao servico)
     {
         _servico = servico;
 
         var menu = new ContextMenuStrip { ShowImageMargin = false };
+
+        // Fica escondido até existir versão nova. No topo, e em negrito, porque é a única entrada
+        // do menu que não é uma ação de gravação: se aparecer no meio das outras, some.
+        _itemAtualizar = new ToolStripMenuItem("Atualização disponível", null, (_, _) => AtualizarPedido?.Invoke())
+        {
+            Visible = false,
+            Font = new Font(SystemFonts.MenuFont ?? SystemFonts.DefaultFont, FontStyle.Bold),
+        };
+        _separadorAtualizar = new ToolStripSeparator { Visible = false };
+        menu.Items.Add(_itemAtualizar);
+        menu.Items.Add(_separadorAtualizar);
+
         _itemGravar = new ToolStripMenuItem("Gravar", null, (_, _) => AlternarGravacao());
         _itemPausar = new ToolStripMenuItem("Pausar", null, (_, _) => _servico.AlternarPausa()) { Enabled = false };
         menu.Items.Add(_itemGravar);
@@ -55,6 +72,14 @@ public sealed class TrayIcon : IDisposable
             ContextMenuStrip = menu,
         };
         _icone.DoubleClick += (_, _) => AbrirPedido?.Invoke();
+
+        // Clicar no balão leva ao lugar onde o balão manda ir. Um aviso que não é clicável obriga
+        // a pessoa a procurar sozinha onde fica o botão de atualizar.
+        _icone.BalloonTipClicked += (_, _) =>
+        {
+            if (_itemAtualizar.Visible) AtualizarPedido?.Invoke();
+            else AbrirPedido?.Invoke();
+        };
 
         // Um segundo: a dica de texto mostra o tempo gravado, e mais frequência do que isso não
         // muda nada para quem olha.
@@ -101,6 +126,14 @@ public sealed class TrayIcon : IDisposable
 
         // O Windows corta a dica em 63 caracteres e engole o resto sem avisar.
         _icone.Text = texto.Length > 62 ? texto[..62] : texto;
+    }
+
+    /// <summary>Deixa a atualização à mão no menu da bandeja, que é onde a janela fechada ainda responde.</summary>
+    public void AnunciarAtualizacao(string versao)
+    {
+        _itemAtualizar.Text = $"Atualizar para a versão {versao}";
+        _itemAtualizar.Visible = true;
+        _separadorAtualizar.Visible = true;
     }
 
     public void Avisar(string titulo, string mensagem, ToolTipIcon tipo = ToolTipIcon.Info)

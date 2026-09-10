@@ -1,11 +1,13 @@
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using Gravador.App.Core;
 using Gravador.App.Views;
 using Gravador.Core;
+using Gravador.Core.Atualizacao;
 using Gravador.Core.Audio;
 using Gravador.Core.Session;
 using Gravador.Core.Settings;
@@ -23,6 +25,9 @@ public partial class App : Application
 
     public static AppSettings Config { get; private set; } = null!;
 
+    /// <summary>Um só para o processo inteiro: ele guarda a hora da última consulta ao GitHub.</summary>
+    public static Atualizador Atualizacoes { get; } = new();
+
     /// <summary>Avisa as telas que a configuração mudou (dispositivos, atalhos, pastas).</summary>
     public static event Action? ConfiguracaoMudou;
 
@@ -32,12 +37,21 @@ public partial class App : Application
 
         // Duas instâncias brigariam pelos atalhos globais e pelos dispositivos de áudio; a segunda
         // apenas traz a primeira para a frente.
-        _instanciaUnica = new Mutex(true, @"Local\GravadorTeteuPower", out var primeira);
-        if (!primeira)
+        //
+        // O modo --render fica de fora: ele não registra atalho nem abre dispositivo, só desenha
+        // num PNG e sai. Passar pelo mutex fazia a verificação encerrar com código 0 sem ter
+        // desenhado nada sempre que houvesse um Gravador aberto — um "passou" que não provava nada,
+        // que é o pior defeito possível numa verificação.
+        var modoRender = e.Args.Contains("--render");
+        if (!modoRender)
         {
-            JanelaPrincipal.TrazerInstanciaExistenteParaFrente();
-            Shutdown();
-            return;
+            _instanciaUnica = new Mutex(true, @"Local\GravadorTeteuPower", out var primeira);
+            if (!primeira)
+            {
+                JanelaPrincipal.TrazerInstanciaExistenteParaFrente();
+                Shutdown();
+                return;
+            }
         }
 
         DispatcherUnhandledException += (_, args) =>
@@ -83,6 +97,7 @@ public partial class App : Application
         _bandeja = new TrayIcon(Servico);
         _bandeja.AbrirPedido += MostrarJanela;
         _bandeja.SairPedido += () => Encerrar();
+        _bandeja.AtualizarPedido += AbrirAtualizacoes;
 
         _atalhos = new HotkeyManager();
         RegistrarAtalhos();
@@ -96,6 +111,56 @@ public partial class App : Application
         if (!naBandeja) MostrarJanela();
 
         Servico.EstadoMudou += estado => Dispatcher.Invoke(() => _bandeja?.AtualizarEstado(estado));
+
+        _ = ProcurarAtualizacaoAoAbrir();
+    }
+
+    /// <summary>
+    /// Procura versão nova alguns segundos depois de abrir, em segundo plano.
+    ///
+    /// Depois e não durante: a abertura já disputa CPU com o motor de áudio e os dispositivos, e
+    /// uma consulta HTTP na frente disso atrasaria justamente o que a pessoa está esperando. E o
+    /// resultado só vira anúncio — nada se instala sozinho.
+    /// </summary>
+    private async Task ProcurarAtualizacaoAoAbrir()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(10));
+            if (!Config.VerificarAtualizacoes) return;
+
+            var nova = await Atualizacoes.ProcurarAsync(Config);
+            if (nova == null) return;
+
+            // Avisa uma vez por versão: quem já viu e não quis não é incomodado de novo até sair
+            // uma posterior.
+            var jaAvisado = string.Equals(nova.Versao, Config.VersaoJaAnunciada, StringComparison.OrdinalIgnoreCase);
+            Config.VersaoJaAnunciada = nova.Versao;
+            Config.Salvar();
+
+            Dispatcher.Invoke(() =>
+            {
+                // O item do menu fica sempre: é onde a pessoa volta a achar isto depois.
+                _bandeja?.AnunciarAtualizacao(nova.Versao);
+
+                // O balão, não. Um pop-up no canto da tela no meio de uma reunião gravada aparece
+                // na gravação de tela de quem estiver compartilhando.
+                if (!jaAvisado && !Servico.EmAndamento)
+                    _bandeja?.Avisar(AppInfo.Nome,
+                        $"Versão {nova.Versao} disponível. Clique aqui para atualizar.");
+            });
+        }
+        catch
+        {
+            // sem rede, GitHub fora do ar, app fechando no meio: atualização é acessório
+        }
+    }
+
+    /// <summary>Abre a janela na aba de configurações, rolada até o cartão de atualização.</summary>
+    private static void AbrirAtualizacoes()
+    {
+        MostrarJanela();
+        if (Current.MainWindow is JanelaPrincipal janela) janela.IrParaAtualizacoes();
     }
 
     /// <summary>

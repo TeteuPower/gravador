@@ -249,7 +249,64 @@ Ele pagou o custo dele já na primeira execução, pegando dois defeitos:
    `RegisterHotKey` recusava. Medindo as alternativas, virou `Ctrl+Alt+N`. Um atalho padrão que não
    funciona na primeira execução é pior do que um sem mnemônico perfeito.
 
+Depois, ele quase deixou de valer alguma coisa por dois motivos que não davam erro nenhum:
+
+3. **O mutex de instância única barrava o `--render`.** Com um Gravador aberto, a verificação
+   encerrava com código 0 sem ter desenhado nada. Um "passou" que não prova nada é pior do que uma
+   falha, porque ninguém vai investigar. Hoje o `--render` não passa pelo mutex — ele não registra
+   atalho nem abre dispositivo, só desenha.
+4. **O PowerShell não espera aplicação de janela.** `& $exe --render` dispara e segue na mesma
+   linha; a conferência das imagens rodava antes de elas existirem. Na esteira é
+   `Start-Process -Wait`.
+
+E o que fica **abaixo da dobra nunca é medido nem pintado** — logo, nunca é verificado. A página de
+configurações é bem mais alta do que a janela, então o `--render` rola até o fim dela pelo mesmo
+caminho que o menu da bandeja usa e desenha uma quinta imagem. São cinco: quatro abas e o pé das
+configurações.
+
 Não substitui olhar: prova que desenha, não que ficou bom.
+
+## Atualizar sozinho
+
+O app pergunta ao GitHub se saiu versão nova, e quem instala é o **mesmo instalador de sempre**,
+rodado em silêncio. Não existe um segundo mecanismo de troca de arquivos para dar errado de um jeito
+diferente: `Atualizador.Instalar` chama `Gravador-Setup-X.Y.Z.exe /VERYSILENT /SUPPRESSMSGBOXES
+/NORESTART`, e o instalador faz o resto.
+
+O que o `installer.iss` precisa ter para isso funcionar está em três lugares:
+
+- `UsePreviousAppDir`, `UsePreviousTasks` e `DisableDirPage=auto` — em modo silencioso não há
+  ninguém para responder onde instalar nem quais atalhos criar. As respostas da instalação anterior
+  valem.
+- `CloseApplications=no` e um `[Code]` que fecha os processos à força. O Restart Manager só sabe
+  pedir para janelas fecharem, e a janela do Gravador costuma estar **oculta na bandeja**. O código
+  mata os **dois** executáveis: o `gravador-cli` sobe como servidor MCP durante uma conversa com o
+  Claude e divide a mesma pasta e o mesmo runtime .NET — um cli esquecido tranca a instalação
+  inteira.
+- Uma linha de `[Run]` com `Check: WizardSilent`, que abre o Gravador de volta na bandeja. Sem ela,
+  atualizar equivale a fechar o programa.
+
+### A versão é um número, e ele mora em um arquivo só
+
+O app compara `AppInfo.Versao` (que vem do assembly, que vem do arquivo `VERSION`) com a versão no
+**nome do instalador anexado** à release. Se os dois divergirem, nada dá erro: ou ninguém recebe
+atualização nenhuma, ou todo mundo recebe a mesma versão em círculo. Por isso a esteira confere que
+`Gravador.exe` relata exatamente o que está no `VERSION` antes de gerar o instalador, e avisa
+quando um push na `main` republica um número que a release `latest` já carregava.
+
+A release `latest` é uma **pré-release** — é assim que ela fica na caixa Releases da página inicial
+sem virar a versão estável. Por isso o app lista as releases e escolhe a maior versão em vez de usar
+`/releases/latest`, que ignora pré-releases justamente.
+
+### Nada se instala sozinho
+
+A consulta é automática; a instalação é sempre um clique. O motivo é o que a ferramenta faz: o
+instalador **fecha o Gravador à força** para trocar os arquivos, e no meio de uma reunião isso custa
+o fim da gravação. O cartão de Atualização recusa enquanto houver gravação em andamento, e o balão
+da bandeja não aparece durante uma — um pop-up no canto da tela entra na gravação de tela de quem
+estiver compartilhando.
+
+O aviso é uma vez por versão (`VersaoJaAnunciada`); a entrada no menu da bandeja fica.
 
 ## O que foi verificado, e como
 
@@ -284,6 +341,27 @@ A sua trilha guarda tudo; a mistura vira o que a reunião ouviu. É exatamente a
 
 Com **"não gravar nada do que eu disser mudo"**, as duas ficam em silêncio no mesmo intervalo — e
 voltam no segundo seguinte à liberação, sem arrastar.
+
+### A atualização no lugar
+
+Feita de ponta a ponta nesta máquina, com o app aberto:
+
+| passo | resultado |
+|---|---|
+| `Gravador-Setup-0.1.0.exe /VERYSILENT` | instalou em `%LOCALAPPDATA%\Programs\Gravador`, 160 MB, 269 arquivos, sem pedir elevação |
+| o instalador abriu o app | sim, na bandeja, pela linha `Check: WizardSilent` |
+| `Gravador-Setup-0.2.0.exe /VERYSILENT` com o 0.1.0 **rodando** | fechou o processo, trocou os arquivos, abriu o novo — código de saída 0 |
+| versão depois | `Gravador.exe` relata 0.2.0.0; o `gravador-cli` da pasta também |
+| entradas em Programas e Recursos | **uma**, "Gravador 0.2.0" — atualizou, não instalou ao lado |
+| `%APPDATA%\Gravador\config.json` | intacto, byte a byte, depois de reinstalar por cima |
+
+A consulta ao GitHub e o download foram exercitados contra um repositório de verdade (as releases do
+`claude-indicator`, que é o único que já tem instalador publicado): listou, escolheu a maior versão,
+leu "2.15.1" do nome do arquivo anexado, baixou os 59,5 MB e o executável baixado abriu íntegro. Com
+`--sem-previas` não achou nada, que é o correto — aquele repositório só tem a pré-release `latest`.
+
+O que **não** foi verificado: a atualização saindo da esteira do GitHub Actions, porque o
+repositório ainda não recebeu `git push`.
 
 ### O custo
 

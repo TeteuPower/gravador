@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Gravador.Core;
+using Gravador.Core.Atualizacao;
 using Gravador.Core.Audio;
 using Gravador.Core.Claude;
 using Gravador.Core.Session;
@@ -59,6 +60,7 @@ internal static partial class Program
             "ferramentas" => FerramentasStatus(resto).GetAwaiter().GetResult(),
             "mcp" => Mcp(resto).GetAwaiter().GetResult(),
             "conversar" => Conversar(resto).GetAwaiter().GetResult(),
+            "atualizacao" or "atualização" => Atualizacao(resto).GetAwaiter().GetResult(),
             "ajuda" or "--ajuda" or "-h" or "--help" => Ajuda(),
             _ => Desconhecido(comando),
         };
@@ -84,6 +86,8 @@ internal static partial class Program
               gravador conta                   mostra por onde o Claude será chamado
               gravador entrar [--manual]       entra com a conta Claude
               gravador ipc                     modo de integração (JSON por linha)
+              gravador atualizacao [--baixar] [--instalar] [--repo dono/nome]
+                                               procura versão nova nas releases do GitHub
 
               gravador importar <arquivo>      vira sessão: áudio, slides, transcrição, tradução
               gravador transcrever <pasta>     transcreve (ou refaz) uma sessão já existente
@@ -115,6 +119,62 @@ internal static partial class Program
     }
 
     // ==================================================================
+
+    /// <summary>
+    /// Procura versão nova e, se pedirem, baixa e instala.
+    ///
+    /// A janela faz o mesmo pelo cartão de Atualização; existir também aqui é o que permite
+    /// atualizar uma máquina por script — e é como a consulta ao GitHub se confere sem abrir a
+    /// interface.
+    /// </summary>
+    private static async Task<int> Atualizacao(string[] argv)
+    {
+        var config = AppSettings.Carregar();
+        var baixar = argv.Contains("--baixar");
+        var instalar = argv.Contains("--instalar");
+
+        var repo = Array.IndexOf(argv, "--repo");
+        if (repo >= 0 && repo + 1 < argv.Length) config.RepositorioDeAtualizacao = argv[repo + 1];
+        if (argv.Contains("--sem-previas")) config.IncluirPreReleases = false;
+
+        Console.WriteLine($"Instalada: versão {AppInfo.Versao}");
+        Console.WriteLine($"Procurando em https://github.com/{config.RepositorioDeAtualizacao}/releases");
+
+        var nova = await new Atualizador().ProcurarAsync(config, forcar: true);
+        if (nova == null)
+        {
+            Console.WriteLine("Nada mais novo por lá (ou o repositório não respondeu).");
+            return 0;
+        }
+
+        Console.WriteLine($"Disponível: versão {nova.Versao}  (tag {nova.Tag})");
+        Console.WriteLine($"  {nova.UrlDaPagina}");
+        if (nova.UrlDoInstalador.Length > 0)
+            Console.WriteLine($"  instalador: {Formato.Tamanho(nova.Bytes)}");
+        else
+            Console.WriteLine("  sem instalador anexado nessa release");
+
+        if (!baixar && !instalar) return 0;
+        if (nova.UrlDoInstalador.Length == 0) { Console.Error.WriteLine("Nada para baixar."); return 1; }
+
+        var ultimo = -1;
+        var progresso = new Progress<double>(p =>
+        {
+            var dez = (int)(p * 10);
+            if (dez == ultimo) return; // uma linha a cada 10%: barra de progresso em log vira lixo
+            ultimo = dez;
+            Console.WriteLine($"  baixando… {p * 100:0}%");
+        });
+
+        var arquivo = await Atualizador.BaixarAsync(nova, progresso);
+        if (arquivo == null) { Console.Error.WriteLine("Não deu para baixar."); return 1; }
+        Console.WriteLine($"Baixado em {arquivo}");
+
+        if (!instalar) return 0;
+
+        Console.WriteLine("Instalando em silêncio. O Gravador vai fechar e abrir de volta na bandeja.");
+        return Atualizador.Instalar(arquivo) ? 0 : 1;
+    }
 
     private static int Dispositivos()
     {

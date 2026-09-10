@@ -61,7 +61,17 @@ internal static class Smoke
             Gravar(janela, Path.Combine(pasta, arquivo));
         }
 
-        Console.WriteLine($"{abas.Length} imagem(ns) em {pasta}");
+        // A tela de configurações é bem mais alta do que a janela, e o que fica abaixo da dobra
+        // nunca é medido nem pintado — logo, nunca é verificado. O cartão de atualização mora no
+        // fim dela. Rolar até lá pelo mesmo caminho que o menu da bandeja usa confere as duas
+        // coisas de uma vez: que o XAML do fim da página monta, e que o atalho até ele funciona.
+        janela.IrParaAtualizacoes();
+        Bombear();
+        janela.UpdateLayout();
+        Bombear();
+        Gravar(janela, Path.Combine(pasta, "5-atualizacao.png"));
+
+        Console.WriteLine($"{abas.Length + 1} imagem(ns) em {pasta}");
         janela.Close();
         return 0;
     }

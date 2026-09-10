@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Gravador.Core;
+using Gravador.Core.Atualizacao;
 using Gravador.Core.Audio;
 using Gravador.Core.Muting;
 using Gravador.Core.Settings;
@@ -169,6 +170,10 @@ public partial class PaginaConfiguracoes : UserControl
         ChkFecharParaBandeja.IsChecked = c.FecharParaBandeja;
         ChkComecarMinimizado.IsChecked = c.ComecarMinimizado;
 
+        ChkVerificarAtualizacoes.IsChecked = c.VerificarAtualizacoes;
+        ChkPreReleases.IsChecked = c.IncluirPreReleases;
+        TxtRepositorio.Text = c.RepositorioDeAtualizacao;
+
         _carregando = false;
 
         TxtGanhoSistema.Text = $"{c.GanhoSistema:0.0}×";
@@ -178,6 +183,7 @@ public partial class PaginaConfiguracoes : UserControl
         AtualizarTranscricao();
         AtualizarAppsVigiados();
         AtualizarAtalhosRecusados();
+        AtualizarCartaoDeAtualizacao();
         TxtSalvo.Text = "";
     }
 
@@ -396,6 +402,10 @@ public partial class PaginaConfiguracoes : UserControl
         c.FecharParaBandeja = ChkFecharParaBandeja.IsChecked == true;
         c.ComecarMinimizado = ChkComecarMinimizado.IsChecked == true;
 
+        c.VerificarAtualizacoes = ChkVerificarAtualizacoes.IsChecked == true;
+        c.IncluirPreReleases = ChkPreReleases.IsChecked == true;
+        c.RepositorioDeAtualizacao = TxtRepositorio.Text.Trim();
+
         App.SalvarConfiguracao();
 
         AtualizarAtalhosRecusados();
@@ -403,5 +413,144 @@ public partial class PaginaConfiguracoes : UserControl
         TxtSalvo.Text = App.Servico.EmAndamento
             ? "Salvo. Trilhas e dispositivos só mudam na próxima gravação."
             : "Salvo.";
+    }
+
+    // ==================================================================
+    // Atualização
+    // ==================================================================
+
+    /// <summary>Traz o cartão de atualização para a vista. Chamado pelo anúncio da bandeja.</summary>
+    public void MostrarAtualizacoes()
+    {
+        // Depois que o layout assentar: rolar até um elemento que ainda não tem posição não faz nada.
+        Dispatcher.BeginInvoke(new Action(() => CartaoAtualizacao.BringIntoView()),
+            System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void AtualizarCartaoDeAtualizacao()
+    {
+        var quando = App.Atualizacoes.UltimaConsulta;
+        TxtVersaoInstalada.Text = $"Instalada: versão {AppInfo.Versao}. "
+            + (quando == DateTimeOffset.MinValue
+                ? "O GitHub ainda não foi consultado nesta sessão."
+                : $"Última consulta: {quando.ToLocalTime():dd/MM 'às' HH:mm}.");
+
+        MostrarVersaoDisponivel(App.Atualizacoes.Disponivel, consultouAgora: false);
+    }
+
+    private void MostrarVersaoDisponivel(VersaoDisponivel? nova, bool consultouAgora)
+    {
+        var visivel = nova != null ? Visibility.Visible : Visibility.Collapsed;
+        BtnInstalarAtualizacao.Visibility = visivel;
+        BtnNotasAtualizacao.Visibility = visivel;
+        BtnNotasAtualizacao.Tag = nova?.UrlDaPagina;
+
+        if (nova == null)
+        {
+            if (consultouAgora)
+                TxtEstadoAtualizacao.Text = $"Você está na versão mais recente ({AppInfo.Versao}).";
+            return;
+        }
+
+        var tamanho = nova.Bytes > 0 ? $" ({Formato.Tamanho(nova.Bytes)})" : "";
+        TxtEstadoAtualizacao.Text = $"Versão {nova.Versao} disponível{tamanho}. "
+            + "Baixar e instalar fecha o Gravador, troca os arquivos e o abre de volta na bandeja — "
+            + "as configurações, o login e as gravações continuam onde estão.";
+    }
+
+    private async void AoProcurarAtualizacao(object sender, RoutedEventArgs e)
+    {
+        var repo = TxtRepositorio.Text.Trim();
+        if (repo.Length == 0)
+        {
+            TxtEstadoAtualizacao.Text = "Sem repositório, não há onde procurar.";
+            return;
+        }
+
+        BtnProcurarAtualizacao.IsEnabled = false;
+        TxtEstadoAtualizacao.Text = "Consultando o GitHub…";
+        try
+        {
+            // O que está na tela ainda pode não ter sido salvo; procurar tem que obedecer ao que a
+            // pessoa acabou de digitar, e não ao que estava no arquivo.
+            var config = new AppSettings
+            {
+                RepositorioDeAtualizacao = repo,
+                IncluirPreReleases = ChkPreReleases.IsChecked == true,
+                VerificarAtualizacoes = true,
+            };
+            var nova = await App.Atualizacoes.ProcurarAsync(config, forcar: true);
+            MostrarVersaoDisponivel(nova, consultouAgora: true);
+        }
+        catch (Exception ex)
+        {
+            TxtEstadoAtualizacao.Text = "Não deu para consultar: " + ex.Message;
+        }
+        finally
+        {
+            BtnProcurarAtualizacao.IsEnabled = true;
+            var quando = App.Atualizacoes.UltimaConsulta;
+            if (quando != DateTimeOffset.MinValue)
+                TxtVersaoInstalada.Text = $"Instalada: versão {AppInfo.Versao}. "
+                    + $"Última consulta: {quando.ToLocalTime():dd/MM 'às' HH:mm}.";
+        }
+    }
+
+    private async void AoInstalarAtualizacao(object sender, RoutedEventArgs e)
+    {
+        var nova = App.Atualizacoes.Disponivel;
+        if (nova == null) return;
+
+        // O instalador fecha o Gravador à força para trocar os arquivos. No meio de uma reunião,
+        // isso custa o fim da gravação — os WAV sobrevivem, mas a mixagem e a linha do tempo não
+        // são fechadas. Atualizar espera; a reunião não.
+        if (App.Servico.EmAndamento)
+        {
+            TxtEstadoAtualizacao.Text = "Tem gravação em andamento. A atualização fecha o Gravador para "
+                + "trocar os arquivos — pare e salve a gravação primeiro.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(nova.UrlDoInstalador))
+        {
+            TxtEstadoAtualizacao.Text = "Essa release não tem instalador anexado. Abrindo a página…";
+            Atualizador.AbrirPagina(nova.UrlDaPagina);
+            return;
+        }
+
+        BtnInstalarAtualizacao.IsEnabled = false;
+        BtnProcurarAtualizacao.IsEnabled = false;
+        try
+        {
+            var progresso = new Progress<double>(p =>
+                TxtEstadoAtualizacao.Text = $"Baixando a versão {nova.Versao}… {p * 100:0}%");
+
+            var arquivo = await Atualizador.BaixarAsync(nova, progresso);
+            if (arquivo == null)
+            {
+                TxtEstadoAtualizacao.Text = "Não deu para baixar. Abrindo a página da release…";
+                Atualizador.AbrirPagina(nova.UrlDaPagina);
+                return;
+            }
+
+            TxtEstadoAtualizacao.Text = "Instalando. O Gravador vai fechar e abrir de volta na bandeja.";
+            if (!Atualizador.Instalar(arquivo))
+                TxtEstadoAtualizacao.Text = "Não deu para iniciar o instalador. "
+                    + $"Ele está em {arquivo} — dá para rodar à mão.";
+        }
+        catch (Exception ex)
+        {
+            TxtEstadoAtualizacao.Text = "Falhou: " + ex.Message;
+        }
+        finally
+        {
+            BtnInstalarAtualizacao.IsEnabled = true;
+            BtnProcurarAtualizacao.IsEnabled = true;
+        }
+    }
+
+    private void AoVerRelease(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is string url && url.Length > 0) Atualizador.AbrirPagina(url);
     }
 }

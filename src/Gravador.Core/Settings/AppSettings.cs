@@ -240,6 +240,26 @@ public sealed class AppSettings
     /// <summary>Fecha para a bandeja em vez de encerrar — a gravação não pode morrer num X sem querer.</summary>
     public bool FecharParaBandeja { get; set; } = true;
 
+    // ---------------- Atualização ----------------
+
+    /// <summary>Procurar versão nova no GitHub ao abrir. A instalação continua sendo sempre um clique seu.</summary>
+    public bool VerificarAtualizacoes { get; set; } = true;
+
+    /// <summary>Dono/repositório de onde vêm as releases. Vazio desliga a procura.</summary>
+    public string RepositorioDeAtualizacao { get; set; } = "TeteuPower/gravador";
+
+    /// <summary>
+    /// Aceitar também a release "latest", que a esteira regera a cada commit na main.
+    /// Ligado por padrão: enquanto a ferramenta está sendo construída, é ali que sai a correção.
+    /// </summary>
+    public bool IncluirPreReleases { get; set; } = true;
+
+    /// <summary>
+    /// Última versão sobre a qual o balão da bandeja já avisou. O aviso é uma vez por versão: a
+    /// entrada no menu da bandeja continua lá, mas o pop-up não volta a cada abertura.
+    /// </summary>
+    public string VersaoJaAnunciada { get; set; } = "";
+
     // ==================================================================
 
     [JsonIgnore]

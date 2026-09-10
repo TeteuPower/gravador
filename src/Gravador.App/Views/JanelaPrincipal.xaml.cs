@@ -52,6 +52,19 @@ public partial class JanelaPrincipal : Window
         if (aba == "conta") PgConta.Recarregar();
     }
 
+    /// <summary>
+    /// Abre a aba de configurações já rolada até o cartão de atualização.
+    ///
+    /// O menu da bandeja anuncia a versão nova, mas quem instala é um botão que fica no fim de uma
+    /// página longa: sem levar a pessoa até ele, o anúncio vira uma caça ao tesouro.
+    /// </summary>
+    public void IrParaAtualizacoes()
+    {
+        AbaConfig.IsChecked = true;
+        PgConfig.Recarregar();
+        PgConfig.MostrarAtualizacoes();
+    }
+
     private void AtualizarLateral()
     {
         var estado = App.Servico.Estado;

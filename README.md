@@ -172,6 +172,7 @@ gravador-cli quadros --video <mp4> --saida <pasta>   # só o funil de slides, pa
 gravador-cli ferramentas [--baixar]        # ffmpeg, whisper e modelo: onde estão, o que falta
 gravador-cli mcp --sessao <pasta>          # o servidor MCP (é assim que o claude nos chama)
 gravador-cli ipc                           # modo de integração, JSON por linha
+gravador-cli atualizacao [--baixar] [--instalar]     # procura versão nova nas releases
 ```
 
 O nome tem hífen por um motivo prático: o Windows não distingue maiúsculas, então `gravador.exe`
@@ -196,6 +197,24 @@ Nesta máquina (i7-14700HX, Windows 11):
 
 Tamanho em disco, por hora de reunião: **~28 MB por trilha** em MP3 a 64 kbps.
 
+## Instalar e atualizar
+
+O instalador sai da esteira do GitHub Actions a cada commit na `main` e fica anexado à release
+[`latest`](https://github.com/TeteuPower/gravador/releases). Ele instala **por usuário**, sem pedir
+administrador: gravar áudio e capturar a tela não precisam de privilégio nenhum, e um instalador que
+pede administrador não passa em máquina de empresa sem chamado aberto.
+
+Depois de instalado, o Gravador procura versão nova sozinho e avisa pela bandeja. Quem instala é
+você, pelo botão em **Configurações → Atualização** — a instalação fecha o programa para trocar os
+arquivos, e isso não pode acontecer no meio de uma reunião. O cartão recusa enquanto houver gravação
+em andamento. Configurações, login e gravações continuam onde estão.
+
+Pela linha de comando, o mesmo caminho: `gravador-cli atualizacao --instalar`.
+
+Quem publica: **subir o número no arquivo `VERSION`** é o que faz as máquinas instaladas receberem a
+atualização. Um commit sem mexer nele publica um instalador que ninguém vai buscar — o que às vezes
+é o certo, e a esteira avisa quando acontece.
+
 ## Compilar
 
 ```powershell
@@ -205,8 +224,12 @@ dotnet build -c Release
 dotnet publish src/Gravador.App -c Release -r win-x64 --self-contained -o publish
 dotnet publish src/Gravador.Cli -c Release -r win-x64 --self-contained -o publish
 
-# conferir a interface sem olhar para a tela (desenha as abas em PNG)
-.\src\Gravador.App\bin\Release\net10.0-windows\Gravador.exe --render C:\temp\telas
+# conferir a interface sem olhar para a tela (desenha as abas e o pé das configurações em PNG)
+Start-Process .\src\Gravador.App\bin\Release\net10.0-windows\Gravador.exe `
+  -ArgumentList '--render','C:\temp\telas' -Wait
+
+# o instalador (Inno Setup 6)
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersao=$(Get-Content VERSION) installer.iss
 ```
 
 ## Licença
