@@ -61,6 +61,7 @@ internal static partial class Program
             "mcp" => Mcp(resto).GetAwaiter().GetResult(),
             "conversar" => Conversar(resto).GetAwaiter().GetResult(),
             "atualizacao" or "atualização" => Atualizacao(resto).GetAwaiter().GetResult(),
+            "legendas" or "legenda" => Legendas(resto).GetAwaiter().GetResult(),
             "ajuda" or "--ajuda" or "-h" or "--help" => Ajuda(),
             _ => Desconhecido(comando),
         };
@@ -96,6 +97,7 @@ internal static partial class Program
               gravador ferramentas [--baixar]  estado do ffmpeg, whisper e modelo
               gravador conversar <pasta> "pergunta"   pergunta ao Claude sobre a sessao
               gravador mcp --sessao <pasta>    servidor MCP da sessao (o claude nos chama assim)
+              gravador legendas --arquivo <mp4>   legenda ao vivo em pt-BR, no ritmo do relogio
 
             OPÇÕES DE `gravar`
               --segundos N        para sozinho depois de N segundos

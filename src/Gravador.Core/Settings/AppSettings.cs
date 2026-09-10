@@ -70,6 +70,32 @@ public enum MotorTranscricao
     Whisper,
 }
 
+/// <summary>
+/// Quem traduz a legenda ao vivo.
+///
+/// A CLI do Claude não está aqui, e não por esquecimento: medida numa sessão persistente já
+/// aquecida, ela levou ~4 s por frase — atraso demais para legenda — e ainda recusou o papel,
+/// tratando a instrução de tradutor como injeção de prompt. Ela continua sendo quem faz o resumo e
+/// a tradução da transcrição depois, onde 4 s não custam nada.
+/// </summary>
+public enum MotorTraducao
+{
+    /// <summary>
+    /// Marian (opus-mt) rodando nesta máquina pelo ONNX Runtime. Offline, sem chave, sem limite e
+    /// sem mandar para fora o que foi falado. Padrão.
+    /// </summary>
+    Marian,
+
+    /// <summary>DeepL. A melhor qualidade em pt-BR; chave gratuita cobre ~500 mil caracteres por mês.</summary>
+    DeepL,
+
+    /// <summary>Azure Translator. Chave gratuita cobre 2 milhões de caracteres por mês.</summary>
+    Azure,
+
+    /// <summary>Nenhum: a legenda sai no idioma original, sem traduzir.</summary>
+    Nenhum,
+}
+
 public enum FonteCredencialClaude
 {
     /// <summary>Usa o login do Claude Code desta máquina, se existir. Padrão.</summary>
@@ -191,6 +217,50 @@ public sealed class AppSettings
 
     /// <summary>Threads do whisper. 0 = metade dos núcleos lógicos, para a máquina continuar usável.</summary>
     public int WhisperThreads { get; set; }
+
+    // ---------------- Legenda ao vivo ----------------
+
+    /// <summary>Mostrar a legenda traduzida numa janela sobre a tela enquanto o áudio toca.</summary>
+    public bool LegendaLigada { get; set; }
+
+    /// <summary>
+    /// Qual áudio legendar. "sistema" é o certo para assistir a uma apresentação: é a voz que vem
+    /// do computador. "microfone" legendaria você mesmo.
+    /// </summary>
+    public string LegendaFonte { get; set; } = "sistema";
+
+    /// <summary>
+    /// Modelo do whisper para a legenda — separado do usado na transcrição final, de propósito.
+    ///
+    /// Aqui manda o atraso, não a qualidade: medido nesta máquina, o encoder do `tiny` custa 548 ms
+    /// a 4 threads contra 1403 ms do `base`. A transcrição final continua podendo usar um modelo
+    /// grande, porque lá esperar minutos é aceitável.
+    /// </summary>
+    public string LegendaModelo { get; set; } = "tiny";
+
+    /// <summary>Idioma FALADO no áudio ("en", "auto"). O destino é <see cref="IdiomaDestino"/>.</summary>
+    public string LegendaIdiomaFala { get; set; } = "en";
+
+    /// <summary>Piso do intervalo entre passadas. O real é o maior entre isto e o que a última levou.</summary>
+    public int LegendaIntervaloMs { get; set; } = 900;
+
+    /// <summary>Threads do whisper na legenda. 0 = um quarto dos núcleos, para sobrar máquina para a reunião.</summary>
+    public int LegendaThreads { get; set; }
+
+    /// <summary>Qual tradutor usar. Ver <see cref="MotorTraducao"/>.</summary>
+    public MotorTraducao LegendaTradutor { get; set; } = MotorTraducao.Marian;
+
+    /// <summary>Mostrar também a linha original em inglês, abaixo da tradução.</summary>
+    public bool LegendaMostrarOriginal { get; set; }
+
+    /// <summary>Nome da variável de ambiente com a chave do DeepL. A chave nunca entra neste arquivo.</summary>
+    public string DeepLChaveEnv { get; set; } = "DEEPL_API_KEY";
+
+    /// <summary>Nome da variável de ambiente com a chave do Azure Translator.</summary>
+    public string AzureChaveEnv { get; set; } = "AZURE_TRANSLATOR_KEY";
+
+    /// <summary>Região do recurso do Azure Translator ("brazilsouth", "eastus"). Exigida pela API.</summary>
+    public string AzureRegiao { get; set; } = "";
 
     // ---------------- Tradução ----------------
 
@@ -335,5 +405,13 @@ public sealed class AppSettings
         ImportacaoLarguraMiniatura = Math.Clamp(ImportacaoLarguraMiniatura, 320, 1280);
         ImportacaoLarguraQuadroFinal = Math.Clamp(ImportacaoLarguraQuadroFinal, 640, 3840);
         if (string.IsNullOrWhiteSpace(IdiomaDestino)) IdiomaDestino = "pt-BR";
+
+        if (LegendaModelo is not ("tiny" or "base" or "small")) LegendaModelo = "tiny";
+        if (!LegendaFonte.Equals("microfone", StringComparison.OrdinalIgnoreCase)) LegendaFonte = "sistema";
+        // O piso não pode ser zero: sem ele, uma máquina rápida rodaria passadas em sequência sem
+        // folga nenhuma e a legenda comeria um núcleo inteiro à toa.
+        LegendaIntervaloMs = Math.Clamp(LegendaIntervaloMs, 300, 5000);
+        LegendaThreads = Math.Clamp(LegendaThreads, 0, 64);
+        if (string.IsNullOrWhiteSpace(LegendaIdiomaFala)) LegendaIdiomaFala = "en";
     }
 }

@@ -194,6 +194,33 @@ public static class Ferramentas
         "https://github.com/ggml-org/whisper.cpp/releases/download/b4938/whisper-bin-x64.zip",
         9, ["Release/*"], ProcurarNoPath: false);
 
+    /// <summary>
+    /// Um dos arquivos do tradutor Marian (opus-mt inglês→línguas românicas), em ONNX quantizado.
+    ///
+    /// São quatro arquivos e não um pacote só porque é assim que o Hugging Face os serve. Somados
+    /// dão ~115 MB — a mesma ordem do modelo `base` do whisper, e é o preço de traduzir sem chave,
+    /// sem cota e sem mandar para fora o que foi falado na reunião.
+    /// </summary>
+    public static FerramentaExterna ArquivoMarian(string arquivo, int mb)
+    {
+        const string baseUrl = "https://huggingface.co/Xenova/opus-mt-en-ROMANCE/resolve/main";
+        var caminhoRemoto = arquivo.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase)
+            ? "onnx/" + arquivo
+            : arquivo;
+        return new FerramentaExterna(
+            $"tradutor Marian ({arquivo})", Path.Combine("marian"), arquivo,
+            $"{baseUrl}/{caminhoRemoto}", mb, [], ProcurarNoPath: false);
+    }
+
+    /// <summary>Os quatro arquivos que o tradutor local precisa, na ordem em que valem ser baixados.</summary>
+    public static IReadOnlyList<FerramentaExterna> Marian { get; } =
+    [
+        ArquivoMarian("encoder_model_quantized.onnx", 53),
+        ArquivoMarian("decoder_model_merged_quantized.onnx", 60),
+        ArquivoMarian("vocab.json", 2),
+        ArquivoMarian("source.spm", 1),
+    ];
+
     /// <summary>Modelo ggml do whisper, pelo nome curto ("base", "small", "medium").</summary>
     public static FerramentaExterna ModeloWhisper(string nome)
     {
