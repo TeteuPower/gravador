@@ -72,8 +72,12 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Abrir o Gravador"; Flags: nowait postinstall skipifsilent
 ; Atualizacao feita pelo proprio app: ele foi fechado para a troca dos arquivos, entao quem o
-; devolve para a bandeja e o instalador. Sem esta linha, atualizar equivale a fechar o programa.
-Filename: "{app}\{#AppExe}"; Parameters: "--minimizado"; Flags: nowait; Check: WizardSilent
+; devolve e o instalador. Sem esta linha, atualizar equivale a fechar o programa.
+;
+; Com a JANELA aberta, e nao na bandeja. Quem atualiza acabou de clicar num botao dentro da janela;
+; devolver o programa escondido faz parecer que ele nao voltou. (A linha veio do claude-indicator,
+; que e um indicador de bandeja e nao tem janela para voltar.)
+Filename: "{app}\{#AppExe}"; Parameters: "--apos-atualizar"; Flags: nowait; Check: WizardSilent
 
 [UninstallDelete]
 ; Configuracao e login ficam em %APPDATA%\Gravador. As GRAVACOES nao: elas moram em

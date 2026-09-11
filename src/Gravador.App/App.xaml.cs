@@ -107,12 +107,53 @@ public partial class App : Application
         // Abrir na bandeja é o modo de quem deixa o Gravador ligado o dia inteiro, e nesse caso a
         // janela nunca aparece: construí-la assim mesmo carregaria a árvore visual e as páginas
         // para nada. O motor de gravação e a bandeja não dependem dela.
-        var naBandeja = Config.ComecarMinimizado || e.Args.Contains("--minimizado");
+        //
+        // Voltar de uma atualização é a exceção, e ela vence até o "abrir minimizado": quem
+        // atualizou acabou de apertar um botão DENTRO da janela, e o programa reaparecer escondido
+        // na bandeja faz parecer que ele não voltou.
+        // Duas formas de saber que acabamos de ser atualizados.
+        //
+        // O argumento é o sinal do instalador, e ele vale já na próxima atualização: quem roda é o
+        // instalador NOVO, baixado, que traz a linha `[Run]` nova.
+        //
+        // A comparação de versões cobre o que o argumento não alcança — quem baixou o .exe da
+        // release e rodou na mão, e qualquer instalador antigo que ainda mande `--minimizado`.
+        var versaoAnterior = Config.UltimaVersaoExecutada;
+        var trocouDeVersao = versaoAnterior.Length > 0 && versaoAnterior != AppInfo.Versao;
+        if (versaoAnterior != AppInfo.Versao)
+        {
+            Config.UltimaVersaoExecutada = AppInfo.Versao;
+            Config.Salvar();
+        }
+
+        var voltandoDeAtualizacao = e.Args.Contains("--apos-atualizar") || trocouDeVersao;
+        var naBandeja = !voltandoDeAtualizacao
+                        && (Config.ComecarMinimizado || e.Args.Contains("--minimizado"));
         if (!naBandeja) MostrarJanela();
 
         Servico.EstadoMudou += estado => Dispatcher.Invoke(() => _bandeja?.AtualizarEstado(estado));
 
+        if (voltandoDeAtualizacao) AvisarQueAtualizou(versaoAnterior);
         _ = ProcurarAtualizacaoAoAbrir();
+    }
+
+    /// <summary>
+    /// Confirma, na volta, que a troca deu certo.
+    ///
+    /// A janela reaparecendo já diz que o programa voltou, mas não diz em qual versão — e é
+    /// exatamente isso que quem apertou "instalar" quer saber. A versão anunciada aqui é lida do
+    /// executável que está rodando, então ela é a prova, e não a promessa.
+    ///
+    /// Também zera a "versão já anunciada": sem isso, o balão da próxima atualização seria
+    /// engolido, porque a anotação ainda apontaria para a versão que acabou de ser instalada.
+    /// </summary>
+    private void AvisarQueAtualizou(string versaoAnterior)
+    {
+        Config.VersaoJaAnunciada = "";
+        Config.Salvar();
+
+        var de = versaoAnterior.Length > 0 ? $" (era a {versaoAnterior})" : "";
+        _bandeja?.Avisar(AppInfo.Nome, $"Atualizado para a versão {AppInfo.Versao}{de}.");
     }
 
     /// <summary>

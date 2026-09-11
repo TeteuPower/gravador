@@ -330,6 +330,16 @@ public sealed class AppSettings
     /// </summary>
     public string VersaoJaAnunciada { get; set; } = "";
 
+    /// <summary>
+    /// Versão que rodou da última vez. Mudou entre uma abertura e outra? Então acabamos de ser
+    /// atualizados, e a janela deve aparecer em vez de ficar na bandeja.
+    ///
+    /// Isto é o que faz a volta da atualização funcionar mesmo quando quem lançou o programa foi um
+    /// instalador antigo — ou quando alguém baixou o .exe e rodou na mão. Vazio é primeira execução,
+    /// que não é atualização nenhuma.
+    /// </summary>
+    public string UltimaVersaoExecutada { get; set; } = "";
+
     // ==================================================================
 
     [JsonIgnore]
