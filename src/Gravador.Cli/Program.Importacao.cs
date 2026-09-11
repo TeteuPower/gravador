@@ -23,10 +23,20 @@ internal static partial class Program
 
         var config = AppSettings.Carregar();
         var opcoes = new OpcoesDeImportacao();
-        for (var i = 1; i < argv.Length; i++)
+        var sequencia = false;
+
+        // Tudo o que vier antes da primeira opção é arquivo. Com `--sequencia`, os vários viram UMA
+        // sessão, na ordem em que foram escritos na linha de comando.
+        var entradas = new List<string>();
+        var i0 = 0;
+        while (i0 < argv.Length && !argv[i0].StartsWith("--")) entradas.Add(argv[i0++]);
+
+        for (var i = i0; i < argv.Length; i++)
         {
             switch (argv[i].ToLowerInvariant())
             {
+                case "--sequencia" or "--sequência": sequencia = true; break;
+                case "--sem-partes": opcoes.TranscricoesPorParte = false; break;
                 case "--titulo" when i + 1 < argv.Length: opcoes.Titulo = argv[++i]; break;
                 case "--idioma" when i + 1 < argv.Length: opcoes.Idioma = argv[++i]; break;
                 case "--motor" when i + 1 < argv.Length: opcoes.Motor = LerMotor(argv[++i]); break;
@@ -45,9 +55,21 @@ internal static partial class Program
         importador.Aviso += a => Console.Error.WriteLine($"  aviso: {a}");
 
         Console.WriteLine();
-        Console.WriteLine($"Importando {argv[0]}");
         var inicio = DateTime.UtcNow;
-        var sessao = await importador.ImportarAsync(argv[0], opcoes, Progresso()).ConfigureAwait(false);
+        SessaoGravacao sessao;
+        if (sequencia && entradas.Count > 1)
+        {
+            Console.WriteLine($"Importando {entradas.Count} arquivos como uma sessão só, nesta ordem:");
+            for (var i = 0; i < entradas.Count; i++)
+                Console.WriteLine($"  {i + 1}. {Path.GetFileName(entradas[i])}");
+            Console.WriteLine();
+            sessao = await importador.ImportarSequenciaAsync(entradas, opcoes, Progresso()).ConfigureAwait(false);
+        }
+        else
+        {
+            Console.WriteLine($"Importando {entradas[0]}");
+            sessao = await importador.ImportarAsync(entradas[0], opcoes, Progresso()).ConfigureAwait(false);
+        }
         LimparLinha();
 
         Console.WriteLine();

@@ -115,6 +115,13 @@ public partial class PaginaSessoes : UserControl
         var lista = arquivos.ToList();
         if (lista.Count == 0) return;
 
+        // Com mais de um arquivo, perguntar antes: eles são partes de uma gravação só ou coisas
+        // separadas? O programa não tem como saber — cinco áudios de WhatsApp são idênticos nos
+        // dois casos — e errar custa caro dos dois lados.
+        var (escolha, ordenados, porParte) = JanelaSequencia.Perguntar(Window.GetWindow(this), lista);
+        if (escolha == EscolhaDaImportacao.Cancelar) return;
+        lista = ordenados.ToList();
+
         _importando = true;
         CartaoImportacao.Visibility = Visibility.Visible;
         TxtImportacaoAviso.Visibility = Visibility.Collapsed;
@@ -125,35 +132,46 @@ public partial class PaginaSessoes : UserControl
 
         try
         {
-            for (var i = 0; i < lista.Count; i++)
+            if (escolha == EscolhaDaImportacao.EmSequencia)
             {
-                var arquivo = lista[i];
-                var posicao = lista.Count > 1 ? $" ({i + 1} de {lista.Count})" : "";
-                TxtImportacaoTitulo.Text = $"Importando {Path.GetFileName(arquivo)}{posicao}";
+                TxtImportacaoTitulo.Text = $"Importando {lista.Count} arquivos como uma sessão só";
                 TxtImportacaoEtapa.Text = "Começando...";
 
-                var importador = new ImportadorDeMidia(App.Config);
-                importador.Aviso += a => Dispatcher.Invoke(() => Recadar(recados, a));
-
-                // Whisper local por padrão, idioma detectado, tradução quando o idioma for outro. É o
-                // caminho que funciona sem chave nenhuma; a primeira vez baixa ferramenta e modelo.
-                var opcoes = new OpcoesDeImportacao
-                {
-                    Motor = App.Config.Transcricao is MotorTranscricao.Remoto ? MotorTranscricao.Remoto : MotorTranscricao.Whisper,
-                    Idioma = "auto",
-                    Traduzir = App.Config.TraduzirQuandoIdiomaDiferente,
-                    Resumir = App.Config.ResumirAoFinal,
-                };
+                var importador = NovoImportador(recados);
+                var opcoes = OpcoesPadrao();
+                opcoes.TranscricoesPorParte = porParte;
 
                 try
                 {
-                    prontas.Add(await importador.ImportarAsync(arquivo, opcoes,
+                    prontas.Add(await importador.ImportarSequenciaAsync(lista, opcoes,
                         new Progress<string>(t => TxtImportacaoEtapa.Text = t)));
                     Recarregar();
                 }
                 catch (Exception ex)
                 {
-                    Recadar(recados, $"{Path.GetFileName(arquivo)}: {ex.Message}");
+                    Recadar(recados, ex.Message);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < lista.Count; i++)
+                {
+                    var arquivo = lista[i];
+                    var posicao = lista.Count > 1 ? $" ({i + 1} de {lista.Count})" : "";
+                    TxtImportacaoTitulo.Text = $"Importando {Path.GetFileName(arquivo)}{posicao}";
+                    TxtImportacaoEtapa.Text = "Começando...";
+
+                    var importador = NovoImportador(recados);
+                    try
+                    {
+                        prontas.Add(await importador.ImportarAsync(arquivo, OpcoesPadrao(),
+                            new Progress<string>(t => TxtImportacaoEtapa.Text = t)));
+                        Recarregar();
+                    }
+                    catch (Exception ex)
+                    {
+                        Recadar(recados, $"{Path.GetFileName(arquivo)}: {ex.Message}");
+                    }
                 }
             }
         }
@@ -183,6 +201,25 @@ public partial class PaginaSessoes : UserControl
             if (prontas.Count == 1) AbrirJanela(prontas[0]);
         }
     }
+
+    private ImportadorDeMidia NovoImportador(List<string> recados)
+    {
+        var importador = new ImportadorDeMidia(App.Config);
+        importador.Aviso += a => Dispatcher.Invoke(() => Recadar(recados, a));
+        return importador;
+    }
+
+    /// <summary>
+    /// Whisper local, idioma detectado, tradução quando o idioma for outro. É o caminho que
+    /// funciona sem chave nenhuma; a primeira vez baixa ferramenta e modelo.
+    /// </summary>
+    private static OpcoesDeImportacao OpcoesPadrao() => new()
+    {
+        Motor = App.Config.Transcricao is MotorTranscricao.Remoto ? MotorTranscricao.Remoto : MotorTranscricao.Whisper,
+        Idioma = "auto",
+        Traduzir = App.Config.TraduzirQuandoIdiomaDiferente,
+        Resumir = App.Config.ResumirAoFinal,
+    };
 
     /// <summary>Acumula avisos e falhas no cartão, em vez de uma sobrescrever a outra.</summary>
     private void Recadar(List<string> recados, string texto)

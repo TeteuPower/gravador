@@ -71,7 +71,25 @@ internal static class Smoke
         Bombear();
         Gravar(janela, Path.Combine(pasta, "5-atualizacao.png"));
 
-        Console.WriteLine($"{abas.Length + 1} imagem(ns) em {pasta}");
+        // A pergunta de "vieram juntos?" é um diálogo modal: ela nunca aparece numa troca de aba,
+        // então sem desenhá-la aqui ela seria a única tela do programa sem verificação nenhuma.
+        // Fora de ordem e com um "10" no meio de proposito: a imagem prova que a ordenacao e a do
+        // Explorador de Arquivos (1, 2, 10) e nao a de texto (1, 10, 2).
+        var sequencia = JanelaSequencia.ParaDesenhar(
+        [
+            @"C:\audios\parte 2.ogg", @"C:\audios\parte 10.ogg", @"C:\audios\parte 1.ogg",
+        ]);
+        sequencia.Left = -32000;
+        sequencia.Top = -32000;
+        sequencia.WindowStartupLocation = WindowStartupLocation.Manual;
+        sequencia.Show();
+        Bombear();
+        sequencia.UpdateLayout();
+        Bombear();
+        Gravar(sequencia, Path.Combine(pasta, "6-sequencia.png"));
+        sequencia.Close();
+
+        Console.WriteLine($"{abas.Length + 2} imagem(ns) em {pasta}");
         janela.Close();
         return 0;
     }

@@ -47,7 +47,7 @@ jobs:
                              -Wait -PassThru -NoNewWindow
           if ($p.ExitCode -ne 0) { throw "o modo --render falhou (código $($p.ExitCode))" }
           $png = Get-ChildItem "$env:RUNNER_TEMP\telas\*.png"
-          if ($png.Count -lt 5) { throw "esperava 5 imagens, saíram $($png.Count)" }
+          if ($png.Count -lt 6) { throw "esperava 6 imagens, saíram $($png.Count)" }
           $png | ForEach-Object { Write-Host "$($_.Name)  $([math]::Round($_.Length/1KB,1)) KB" }
 
       - name: Enviar as telas como artefato

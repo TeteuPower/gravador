@@ -22,6 +22,23 @@ public sealed class OpcoesDeImportacao
     public bool Transcrever { get; set; } = true;
     public bool Traduzir { get; set; } = true;
     public bool Resumir { get; set; }
+
+    /// <summary>
+    /// Numa importação em sequência, também gravar um .md por parte, em <c>partes/</c>.
+    ///
+    /// O <c>transcricao.md</c> contínuo sai sempre — é ele que a janela mostra e que o Claude lê. Os
+    /// arquivos por parte são um extra para quem quer mandar um áudio específico adiante.
+    /// </summary>
+    public bool TranscricoesPorParte { get; set; } = true;
+}
+
+/// <summary>Uma parte de uma importação em sequência, e onde ela caiu na linha do tempo.</summary>
+/// <param name="Arquivo">Caminho do arquivo original.</param>
+/// <param name="Em">Segundo em que esta parte começa dentro do áudio combinado.</param>
+/// <param name="Duracao">Quanto ela dura.</param>
+public sealed record ParteImportada(string Arquivo, TimeSpan Em, TimeSpan Duracao)
+{
+    public string Nome => Path.GetFileNameWithoutExtension(Arquivo);
 }
 
 /// <summary>
@@ -36,7 +53,7 @@ public sealed class OpcoesDeImportacao
 /// A ordem das etapas é a do valor: o áudio sai primeiro (14 s para uma hora) porque é ele que a
 /// transcrição precisa; os quadros vêm depois (alguns minutos) e são bônus.
 /// </summary>
-public sealed class ImportadorDeMidia
+public sealed partial class ImportadorDeMidia
 {
     private readonly AppSettings _config;
 

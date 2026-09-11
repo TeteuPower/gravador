@@ -1,0 +1,59 @@
+<Window x:Class="Gravador.App.Views.JanelaSequencia"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Importar vários arquivos" Height="520" Width="620"
+        MinHeight="420" MinWidth="520"
+        Background="{StaticResource Fundo}" WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize" ShowInTaskbar="False"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Ideal">
+
+    <Grid Margin="24,20,24,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" x:Name="TxtTitulo" Style="{StaticResource Titulo}" Text="5 arquivos"/>
+
+        <TextBlock Grid.Row="1" Style="{StaticResource Fraco}" Margin="0,6,0,14" TextWrapping="Wrap"
+                   Text="Eles fazem parte da mesma gravação — partes de uma conversa, por exemplo — ou são coisas separadas?"/>
+
+        <Border Grid.Row="2" Style="{StaticResource Cartao}" Margin="0,0,0,14" Padding="0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,12">
+                <ItemsControl x:Name="Lista">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="28"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Numero, Mode=OneWay}"
+                                           FontFamily="Consolas" Foreground="{StaticResource TextoFraco}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Nome, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Row="3" Margin="0,0,0,16">
+            <TextBlock Style="{StaticResource Fraco}" TextWrapping="Wrap" Margin="0,0,0,8"
+                       Text="Esta é a ordem em que eles serão colados, pelo nome do arquivo — a mesma que o Explorador de Arquivos mostra."/>
+            <CheckBox x:Name="ChkPorParte" IsChecked="True"
+                      Content="Gravar também um .md por parte, na subpasta &quot;partes&quot;"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancelar" Style="{StaticResource BotaoDiscreto}" Click="AoCancelar" MinWidth="90"/>
+            <Button Content="Separados — uma sessão para cada" Click="AoSeparados" Margin="8,0,0,0" MinWidth="150"/>
+            <Button x:Name="BtnSequencia" Content="Em sequência — uma sessão só" Click="AoSequencia" Margin="8,0,0,0"
+                    Style="{StaticResource BotaoPrincipal}" Background="{StaticResource Acento}"
+                    BorderBrush="{StaticResource Acento}" Foreground="#12141C" MinWidth="150" IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

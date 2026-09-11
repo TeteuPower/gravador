@@ -91,6 +91,7 @@ internal static partial class Program
                                                procura versão nova nas releases do GitHub
 
               gravador importar <arquivo>      vira sessão: áudio, slides, transcrição, tradução
+              gravador importar a.ogg b.ogg --sequencia   vários arquivos viram UMA sessão, na ordem
               gravador transcrever <pasta>     transcreve (ou refaz) uma sessão já existente
               gravador traduzir <pasta>        traduz a transcrição com o Claude
               gravador quadros --video <mp4> --saida <pasta>   só o funil de slides, para calibrar
@@ -112,6 +113,8 @@ internal static partial class Program
               --motor whisper|windows|remoto|nenhum   quem transcreve (padrão: whisper)
               --idioma auto|en|pt-BR   idioma da fala (padrão: detecta)
               --modelo base|small|medium   modelo do whisper (padrão: base)
+              --sequencia      os arquivos são partes de uma gravação só, coladas na ordem dada
+              --sem-partes     na sequência, não gravar um .md por parte
               --titulo TEXTO   --sem-quadros   --sem-transcricao   --sem-traducao   --resumir
 
             A configuração completa fica em {Path.Combine(AppInfo.PastaDados, "config.json")}
