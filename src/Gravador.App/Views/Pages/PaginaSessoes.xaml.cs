@@ -112,23 +112,28 @@ public partial class PaginaSessoes : UserControl
     private async Task ImportarVariosAsync(IEnumerable<string> arquivos)
     {
         if (_importando) return;
+        var lista = arquivos.ToList();
+        if (lista.Count == 0) return;
+
         _importando = true;
         CartaoImportacao.Visibility = Visibility.Visible;
         TxtImportacaoAviso.Visibility = Visibility.Collapsed;
+        TxtImportacaoAviso.Text = "";
+
+        var prontas = new List<SessaoGravacao>();
+        var recados = new List<string>();
 
         try
         {
-            foreach (var arquivo in arquivos)
+            for (var i = 0; i < lista.Count; i++)
             {
-                TxtImportacaoTitulo.Text = "Importando " + Path.GetFileName(arquivo);
+                var arquivo = lista[i];
+                var posicao = lista.Count > 1 ? $" ({i + 1} de {lista.Count})" : "";
+                TxtImportacaoTitulo.Text = $"Importando {Path.GetFileName(arquivo)}{posicao}";
                 TxtImportacaoEtapa.Text = "Começando...";
 
                 var importador = new ImportadorDeMidia(App.Config);
-                importador.Aviso += a => Dispatcher.Invoke(() =>
-                {
-                    TxtImportacaoAviso.Text = a;
-                    TxtImportacaoAviso.Visibility = Visibility.Visible;
-                });
+                importador.Aviso += a => Dispatcher.Invoke(() => Recadar(recados, a));
 
                 // Whisper local por padrão, idioma detectado, tradução quando o idioma for outro. É o
                 // caminho que funciona sem chave nenhuma; a primeira vez baixa ferramenta e modelo.
@@ -142,22 +147,49 @@ public partial class PaginaSessoes : UserControl
 
                 try
                 {
-                    var sessao = await importador.ImportarAsync(arquivo, opcoes, new Progress<string>(t => TxtImportacaoEtapa.Text = t));
+                    prontas.Add(await importador.ImportarAsync(arquivo, opcoes,
+                        new Progress<string>(t => TxtImportacaoEtapa.Text = t)));
                     Recarregar();
-                    AbrirJanela(sessao);
                 }
                 catch (Exception ex)
                 {
-                    TxtImportacaoEtapa.Text = "Não deu: " + ex.Message;
-                    await Task.Delay(4000);
+                    Recadar(recados, $"{Path.GetFileName(arquivo)}: {ex.Message}");
                 }
             }
         }
         finally
         {
             _importando = false;
-            CartaoImportacao.Visibility = Visibility.Collapsed;
+
+            // O cartão só some quando deu tudo certo.
+            //
+            // Antes ele sumia SEMPRE, e junto com ele a mensagem do que falhou — que ficava quatro
+            // segundos na tela e desaparecia. Foi assim que cinco arquivos não importaram e a única
+            // pista que sobrou foi eles não estarem na lista.
+            if (recados.Count == 0)
+            {
+                CartaoImportacao.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                TxtImportacaoTitulo.Text = prontas.Count > 0
+                    ? $"{prontas.Count} importada(s), {recados.Count} com problema"
+                    : $"Não importou: {lista.Count} arquivo(s)";
+                TxtImportacaoEtapa.Text = "Isto fica aqui até a próxima importação.";
+            }
+
+            // Uma janela por arquivo abriria cinco de uma vez. Com vários, a lista já mostra o que
+            // entrou e quem quiser abre a que interessa.
+            if (prontas.Count == 1) AbrirJanela(prontas[0]);
         }
+    }
+
+    /// <summary>Acumula avisos e falhas no cartão, em vez de uma sobrescrever a outra.</summary>
+    private void Recadar(List<string> recados, string texto)
+    {
+        recados.Add(texto);
+        TxtImportacaoAviso.Text = string.Join("\n", recados);
+        TxtImportacaoAviso.Visibility = Visibility.Visible;
     }
 
     // ==================================================================

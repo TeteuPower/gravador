@@ -78,8 +78,33 @@ public sealed class ImportadorDeMidia
         }
 
         var duracao = info?.Duracao ?? DuracaoPeloMediaFoundation(arquivo);
+
+        // O Media Foundation não abre tudo, e quando não abre ele devolve zero sem dizer por quê.
+        // Ogg/Opus é o caso que dói: é o formato da nota de voz do WhatsApp, que é justamente o que
+        // mais se importa aqui. FLAC e alguns MKV passam pelo mesmo buraco.
+        //
+        // Perguntar ao ffprobe antes de desistir não é custo novo: quando o Windows falha aqui, o
+        // ExtratorDeAudio já ia cair no ffmpeg para tirar o áudio de qualquer jeito. Antes disto, a
+        // importação morria nesta linha e o arquivo nem chegava lá.
         if (duracao <= TimeSpan.Zero)
-            throw new InvalidOperationException("Não consegui ler a duração do arquivo — ele é um áudio ou vídeo que o Windows abre?");
+        {
+            etapa?.Report("O Windows não abre este formato; lendo com o ffprobe...");
+            try
+            {
+                info ??= await Ffmpeg.SondarAsync(arquivo, progressoDownload, ct).ConfigureAwait(false);
+                duracao = info.Duracao;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"Não consegui abrir \"{Path.GetFileName(arquivo)}\" nem pelo Windows nem pelo ffprobe. {ex.Message}", ex);
+            }
+        }
+
+        if (duracao <= TimeSpan.Zero)
+            throw new InvalidOperationException(
+                $"\"{Path.GetFileName(arquivo)}\" não tem duração legível — o arquivo pode estar truncado ou vazio.");
 
         // ---- 2. a sessão ----
         var sessao = SessaoGravacao.CriarImportada(_config, arquivo, opcoes.Titulo);

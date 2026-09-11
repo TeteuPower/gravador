@@ -29,7 +29,7 @@
                     <TextBlock x:Name="TxtImportacaoTitulo" FontWeight="SemiBold" Text="Importando..."/>
                     <TextBlock x:Name="TxtImportacaoEtapa" Style="{StaticResource Fraco}" Margin="0,6,0,0"/>
                     <TextBlock x:Name="TxtImportacaoAviso" Style="{StaticResource Fraco}" Margin="0,4,0,0"
-                               Foreground="{StaticResource Aviso}" Visibility="Collapsed"/>
+                               Foreground="{StaticResource Aviso}" Visibility="Collapsed" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
