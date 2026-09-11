@@ -84,12 +84,19 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                    <RadioButton x:Name="AbaResumo" Style="{StaticResource Aba}" Content="Resumo" Tag="resumo" Checked="AoTrocarTexto" IsChecked="True"/>
-                    <RadioButton x:Name="AbaTraducao" Style="{StaticResource Aba}" Content="Tradução" Tag="traducao" Checked="AoTrocarTexto"/>
-                    <RadioButton x:Name="AbaTranscricao" Style="{StaticResource Aba}" Content="Transcrição original" Tag="transcricao" Checked="AoTrocarTexto"/>
-                    <RadioButton x:Name="AbaConversaMd" Style="{StaticResource Aba}" Content="Conversa" Tag="conversa" Checked="AoTrocarTexto"/>
-                </StackPanel>
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="AbaResumo" Style="{StaticResource Aba}" Content="Resumo" Tag="resumo" Checked="AoTrocarTexto" IsChecked="True"/>
+                        <RadioButton x:Name="AbaTraducao" Style="{StaticResource Aba}" Content="Tradução" Tag="traducao" Checked="AoTrocarTexto"/>
+                        <RadioButton x:Name="AbaTranscricao" Style="{StaticResource Aba}" Content="Transcrição original" Tag="transcricao" Checked="AoTrocarTexto"/>
+                        <RadioButton x:Name="AbaConversaMd" Style="{StaticResource Aba}" Content="Conversa" Tag="conversa" Checked="AoTrocarTexto"/>
+                    </StackPanel>
+                    <!-- Serve as quatro abas: elas dividem a mesma caixa de texto, então copiar é
+                         sempre "copiar o que está na tela". -->
+                    <Button x:Name="BtnCopiar" Content="Copiar tudo" Style="{StaticResource BotaoDiscreto}"
+                            HorizontalAlignment="Right" VerticalAlignment="Center" Click="AoCopiar"
+                            Padding="10,4" FontSize="11.5"/>
+                </Grid>
                 <Border Grid.Row="1" Style="{StaticResource Cartao}" Margin="0" Padding="0">
                     <TextBox x:Name="TxtCorpo" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
                              VerticalScrollBarVisibility="Auto" BorderThickness="0" Background="Transparent"

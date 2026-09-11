@@ -104,14 +104,44 @@ public partial class JanelaSessao : Window
             "conversa" => "A conversa com o Claude fica registrada aqui, e no arquivo conversa.md da pasta.",
             _ => "Ainda não há resumo. Use o botão \"Resumir com o Claude\" — ele lê a transcrição e os slides pelas ferramentas do Gravador.",
         };
+        var existe = File.Exists(caminho);
         try
         {
-            TxtCorpo.Text = File.Exists(caminho) ? File.ReadAllText(caminho) : vazio;
+            TxtCorpo.Text = existe ? File.ReadAllText(caminho) : vazio;
         }
         catch (Exception ex)
         {
             TxtCorpo.Text = "Não deu para ler: " + ex.Message;
+            existe = false;
         }
+
+        // Só dá para copiar o que existe: o texto da aba vazia é uma instrução ("use o botão
+        // Traduzir"), e copiá-la para a área de transferência seria uma pegadinha.
+        if (BtnCopiar != null)
+        {
+            BtnCopiar.IsEnabled = existe;
+            BtnCopiar.Content = "Copiar tudo";
+        }
+    }
+
+    /// <summary>Copia o texto da aba que está aberta.</summary>
+    private async void AoCopiar(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // A área de transferência é do Windows inteiro e às vezes está tomada por outro
+            // programa; o WPF tenta de novo por conta própria, e o que sobra é dizer que não deu.
+            Clipboard.SetText(TxtCorpo.Text);
+            BtnCopiar.Content = "Copiado";
+        }
+        catch (Exception ex)
+        {
+            BtnCopiar.Content = "Não deu";
+            TxtEstado.Text = "Não deu para copiar: " + ex.Message;
+        }
+
+        await Task.Delay(1500);
+        if (BtnCopiar.IsEnabled) BtnCopiar.Content = "Copiar tudo";
     }
 
     private void AoClicarQuadro(object sender, MouseButtonEventArgs e)
@@ -150,17 +180,22 @@ public partial class JanelaSessao : Window
         AbaTranscricao.IsChecked = true;
     }
 
-    private async void AoTraduzir(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Abre a janela de tradução, que pergunta os idiomas antes e mostra o progresso depois.
+    ///
+    /// Não usa o <see cref="Executar"/> das outras ações de propósito: aquele mostra o andamento numa
+    /// linha do rodapé, que numa transcrição longa fica parada por minutos parecendo travada. Aqui
+    /// quem manda no cancelamento e no progresso é a própria janela.
+    /// </summary>
+    private void AoTraduzir(object sender, RoutedEventArgs e)
     {
-        await Executar(async (etapa, ct) =>
-        {
-            var conta = ContaClaude.Estado(App.Config);
-            if (!conta.Conectado) throw new InvalidOperationException(conta.Descricao);
-            var r = await Tradutor.TraduzirAsync(_sessao, App.Config, PosProcessamento.TokenDe(conta), etapa, ct);
-            if (!r.Ok) throw new InvalidOperationException(r.Erro);
-            etapa.Report($"Tradução pronta ({r.TokensEntrada:N0} tokens de entrada, {r.TokensSaida:N0} de saída).");
-        });
+        var janela = new JanelaTraducao(_sessao) { Owner = this };
+        janela.ShowDialog();
+        if (!janela.Traduziu) { Recarregar(); return; }
+
+        Recarregar();
         AbaTraducao.IsChecked = true;
+        TxtEstado.Text = "Tradução pronta.";
     }
 
     private async void AoResumir(object sender, RoutedEventArgs e)

@@ -35,15 +35,29 @@ public static class Tradutor
         - Responda só com as linhas traduzidas, nada antes nem depois.
         """;
 
+    /// <summary>
+    /// Traduz a transcrição da sessão, em pedaços.
+    /// </summary>
+    /// <param name="idiomaDestino">
+    /// Para qual idioma. Vazio usa o das configurações — é o que a tela de tradução preenche quando
+    /// alguém escolhe outro só para esta sessão, sem mexer na preferência geral.
+    /// </param>
+    /// <param name="passos">
+    /// Progresso em número de pedaços, para uma barra de verdade. O <paramref name="etapa"/> conta a
+    /// mesma coisa em texto, mas quem desenha barra não deveria ter que interpretar frase.
+    /// </param>
     public static async Task<RespostaDoClaude> TraduzirAsync(SessaoGravacao sessao, AppSettings config,
-        string? tokenOAuth, IProgress<string>? etapa = null, CancellationToken ct = default)
+        string? tokenOAuth, IProgress<string>? etapa = null, CancellationToken ct = default,
+        string? idiomaDestino = null, IProgress<(int Feito, int Total)>? passos = null)
     {
         var falas = sessao.Falas.OrderBy(f => f.DeSegundos).ToList();
         if (falas.Count == 0)
             return new RespostaDoClaude(false, "", "Não há transcrição para traduzir.", null, TimeSpan.Zero);
 
-        var destino = NomeDoIdioma(config.IdiomaDestino);
+        var codigoDestino = string.IsNullOrWhiteSpace(idiomaDestino) ? config.IdiomaDestino : idiomaDestino!;
+        var destino = NomeDoIdioma(codigoDestino);
         var pedacos = Fatiar(falas);
+        passos?.Report((0, pedacos.Count));
         var traduzidas = new List<string>(falas.Count);
         var inicio = DateTime.UtcNow;
         double custo = 0;
@@ -70,6 +84,7 @@ public static class Tradutor
             entrada += resposta.TokensEntrada ?? 0;
             saida += resposta.TokensSaida ?? 0;
             traduzidas.AddRange(Alinhar(pedacos[i], resposta.Texto));
+            passos?.Report((i + 1, pedacos.Count));
         }
 
         var sb = new StringBuilder();
@@ -81,7 +96,7 @@ public static class Tradutor
         foreach (var linha in traduzidas) sb.AppendLine(linha);
 
         await File.WriteAllTextAsync(sessao.CaminhoTraducao, sb.ToString(), Encoding.UTF8, ct).ConfigureAwait(false);
-        sessao.IdiomaDaTraducao = config.IdiomaDestino;
+        sessao.IdiomaDaTraducao = codigoDestino;
         sessao.Salvar();
 
         return new RespostaDoClaude(true, sb.ToString(), null, custo, DateTime.UtcNow - inicio, null, entrada, saida);

@@ -64,6 +64,22 @@
                 <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
 
+            <!-- Rótulo de campo e texto de explicação. Nasceram dentro da página de configurações e
+                 subiram para cá quando a segunda tela precisou deles: um StaticResource que existe
+                 só no dicionário de outra tela não dá erro de compilação nenhum — ele estoura na
+                 hora de abrir a janela, que é o pior momento possível para descobrir. -->
+            <Style x:Key="Rotulo" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource Texto}"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="0,0,14,0"/>
+            </Style>
+
+            <Style x:Key="Dica" TargetType="TextBlock" BasedOn="{StaticResource Fraco}">
+                <Setter Property="FontSize" Value="11.5"/>
+                <Setter Property="Margin" Value="0,4,0,10"/>
+            </Style>
+
             <!-- ================= Botões ================= -->
             <Style TargetType="Button">
                 <Setter Property="FontFamily" Value="{StaticResource Fonte}"/>

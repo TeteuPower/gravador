@@ -191,7 +191,36 @@ internal static class Smoke
         janela.UpdateLayout();
         Bombear();
         Gravar(janela, Path.Combine(destino, "sessao.png"));
-        Console.WriteLine("sessao.png em " + destino);
+
+        // De novo na aba com texto: é o único jeito de ver o botão de copiar LIGADO. Na aba vazia
+        // ele fica apagado de propósito — copiar a frase "ainda não há resumo" seria uma pegadinha —
+        // e uma imagem só do estado apagado não prova que o outro existe.
+        if (janela.FindName("AbaTranscricao") is System.Windows.Controls.RadioButton aba)
+        {
+            aba.IsChecked = true;
+            Bombear();
+            janela.UpdateLayout();
+            Bombear();
+            Gravar(janela, Path.Combine(destino, "sessao-transcricao.png"));
+        }
+
+        // A janela de tradução precisa de uma sessão de verdade para ter o que contar (quantos
+        // trechos, quantas chamadas), então ela é desenhada aqui e não na volta das abas.
+        var traducao = new JanelaTraducao(sessao)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -32000,
+            Top = -32000,
+            ShowInTaskbar = false,
+        };
+        traducao.Show();
+        Bombear();
+        traducao.UpdateLayout();
+        Bombear();
+        Gravar(traducao, Path.Combine(destino, "traducao.png"));
+        traducao.Close();
+
+        Console.WriteLine("sessao.png e traducao.png em " + destino);
         janela.Close();
         return 0;
     }

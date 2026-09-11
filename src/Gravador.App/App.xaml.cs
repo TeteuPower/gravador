@@ -56,6 +56,19 @@ public partial class App : Application
 
         DispatcherUnhandledException += (_, args) =>
         {
+            // No modo --render, quebrar tem que FALHAR, não abrir uma caixa de diálogo.
+            //
+            // A caixa espera alguém clicar em OK. Numa verificação — na esteira ou aqui na máquina —
+            // não há ninguém, então o processo fica pendurado até o tempo acabar, e o pouco que se
+            // aprende é "travou". Pior: a caixa aparece na tela de quem estiver usando o computador,
+            // vinda de um processo que deveria ser invisível. Foi assim que um StaticResource
+            // faltando virou um pop-up no meio do trabalho de outra pessoa.
+            if (e.Args.Contains("--render"))
+            {
+                Console.Error.WriteLine("O --render quebrou: " + args.Exception);
+                Environment.Exit(3);
+            }
+
             MessageBox.Show($"Algo quebrou:\n\n{args.Exception.Message}", AppInfo.Nome,
                 MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;

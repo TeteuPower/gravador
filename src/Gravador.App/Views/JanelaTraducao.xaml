@@ -1,0 +1,66 @@
+<Window x:Class="Gravador.App.Views.JanelaTraducao"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Traduzir" Height="430" Width="560" ResizeMode="NoResize"
+        Background="{StaticResource Fundo}" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" UseLayoutRounding="True" TextOptions.TextFormattingMode="Ideal">
+
+    <Grid Margin="24,20,24,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock x:Name="TxtTitulo" Style="{StaticResource Titulo}" Text="Traduzir a transcrição"/>
+            <TextBlock x:Name="TxtResumoDaSessao" Style="{StaticResource Fraco}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- ========== Escolha dos idiomas ========== -->
+        <StackPanel Grid.Row="1" x:Name="PainelEscolha" Margin="0,18,0,0">
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Do idioma" Style="{StaticResource Rotulo}"/>
+                <ComboBox Grid.Column="1" x:Name="CmbOrigem" IsEditable="True" MinWidth="230" HorizontalAlignment="Left"/>
+            </Grid>
+            <TextBlock Style="{StaticResource Dica}" Margin="0,0,0,14" TextWrapping="Wrap"
+                       Text="Foi o que o whisper detectou. Corrigir aqui só muda o que fica escrito no cabeçalho — o Claude traduz pelo que lê."/>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Para o idioma" Style="{StaticResource Rotulo}"/>
+                <ComboBox Grid.Column="1" x:Name="CmbDestino" IsEditable="True" MinWidth="230" HorizontalAlignment="Left"/>
+            </Grid>
+            <TextBlock Style="{StaticResource Dica}" TextWrapping="Wrap"
+                       Text="Vale só para esta tradução; a preferência das configurações continua como está."/>
+
+            <TextBlock x:Name="TxtAviso" Style="{StaticResource Fraco}" Margin="0,16,0,0" TextWrapping="Wrap"
+                       Foreground="{StaticResource Aviso}" Visibility="Collapsed"/>
+        </StackPanel>
+
+        <!-- ========== Progresso ========== -->
+        <StackPanel Grid.Row="1" x:Name="PainelProgresso" Margin="0,24,0,0" Visibility="Collapsed">
+            <TextBlock x:Name="TxtEtapa" Text="Começando..." FontWeight="SemiBold"/>
+            <ProgressBar x:Name="Barra" Height="10" Margin="0,12,0,0" Minimum="0" Maximum="1"
+                         Background="{StaticResource Superficie}" BorderBrush="{StaticResource Borda}"
+                         Foreground="{StaticResource Acento}"/>
+            <TextBlock x:Name="TxtContagem" Style="{StaticResource Fraco}" Margin="0,8,0,0"/>
+            <TextBlock Style="{StaticResource Dica}" Margin="0,16,0,0" TextWrapping="Wrap"
+                       Text="Cada parte é uma chamada ao Claude, com as linhas carimbadas. Os carimbos são o que mantém a tradução alinhada ao áudio."/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="BtnFechar" Content="Cancelar" Style="{StaticResource BotaoDiscreto}" Click="AoCancelar" MinWidth="96"/>
+            <Button x:Name="BtnTraduzir" Content="Traduzir" Click="AoTraduzir" Margin="8,0,0,0" MinWidth="140"
+                    Style="{StaticResource BotaoPrincipal}" Background="{StaticResource Acento}"
+                    BorderBrush="{StaticResource Acento}" Foreground="#12141C" IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
